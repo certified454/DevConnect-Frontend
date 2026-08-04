@@ -35,6 +35,15 @@ import {
   SelectDragIndicatorWrapper,
   SelectItem,
 } from '@/components/ui/select';
+import {
+  Popover,
+  PopoverBackdrop,
+  PopoverArrow,
+  PopoverBody,
+  PopoverContent,
+} from '@/components/ui/popover';
+import { Pressable } from 'react-native';
+import { Button, ButtonText } from '@/components/ui/button';
 
 // Dummy data for navigation items
 const navItems = [
@@ -89,7 +98,10 @@ const tags = ["#today'stopic", '#Devwahala', '#dev', '#NgPower'];
 export default function Home() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [selectedState, setSelectedState] = useState('all');
+  const [isOpen, setIsOpen] = useState(false);
 
+  const handleOpen = () => setIsOpen(true);
+  const handleClose = () => setIsOpen(false);
 
   const visiblePosts =
     selectedState === 'all'
@@ -103,27 +115,32 @@ export default function Home() {
         <Box className="hidden md:block md:w-64 md:shrink-0" />
 
         {/* Main content */}
-        <Box className="flex-1 p-2 md:ml-2 md:p-10">
-          <div className="welcome-card mb-4 overflow-hidden rounded-3xl border border-amber-100 p-5 shadow-sm shadow-amber-100/70 md:mb-6 md:p-6">
+        <Box className="flex-1 p-2 md:ml-2 md:p-6">
+          <div className="welcome-card mb-2 overflow-hidden rounded-3xl border border-amber-100 p-5 shadow-sm shadow-amber-100/70 md:mb-2 md:p-6">
             <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
               <div className=" flex flex-col gap-1">
                 <Text className="text-sl font-semibold uppercase tracking-[0.24em] text-amber-600">
                   Welcome to DevConnect
                 </Text>
                 <Text className="text-sm text-slate-900">
-                here developers connect, share knowledge, fix problems, and collaborate on projects.
+                Here developers connect, share knowledge, fix problems, and collaborate on projects.
               </Text>
               <Text className="text-sm text-slate-900">
                 explore discussions, join communities, and stay updated with the latest in the tech world
               </Text>
               </div>
                 
+              <div className="flex flex-col justify-center gap-3 md:items-center">
+                <div className="welcome-badge flex items-center gap-2 rounded-full bg-white/80 px-3 py-2 shadow-sm">
+                  <span className="welcome-dot h-2.5 w-2.5 rounded-full bg-amber-500" />
+                  <Text className="text-sm font-medium text-slate-700">
+                    Fresh conversations are live
+                  </Text>
+                </div>
 
-              <div className="welcome-badge flex items-center gap-2 self-start rounded-full bg-white/80 px-3 py-2 shadow-sm">
-                <span className="welcome-dot h-2.5 w-2.5 rounded-full bg-amber-500" />
-                <Text className="text-sm font-medium text-slate-700">
-                  Fresh conversations are live
-                </Text>
+                <Pressable className="mt-3 w-40 items-center rounded-full bg-amber-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition duration-200 hover:bg-amber-700 md:mt-0">
+                  <Text className="text-sl font-semibold text-white">Sign In</Text>
+                </Pressable>
               </div>
               
             </div>
@@ -199,7 +216,31 @@ export default function Home() {
                         <Text className="text-sm text-gray">3 hr ago · {post.state}</Text>
                       </Box>
                     </Box>
-                    <Icon as={ThreeDotsIcon} size="xl" />
+                    <Popover
+                      isOpen={isOpen}
+                      onClose={handleClose}
+                      onOpen={handleOpen}
+                      placement="bottom"
+                      trigger={(triggerProps) => {
+                        return (
+                          <Button className='bg-slate-950/10' {...triggerProps}>
+                            <ButtonText>
+                              <Icon as={ThreeDotsIcon} className="h-5 w-5 text-black" />
+                            </ButtonText>
+                          </Button>
+                        );
+                      }}
+                    >
+                      <PopoverBackdrop />
+                      <PopoverContent>
+                        <PopoverArrow />
+                        <PopoverBody>
+                          <Text className="text-foreground">
+                             Skip this post
+                          </Text>
+                        </PopoverBody>
+                      </PopoverContent>
+                    </Popover>
                   </Box>
 
                   <Text className="text-3xl font-bold text-slate-900">
@@ -243,13 +284,49 @@ export default function Home() {
             </VStack>
 
             <Box className="w-full md:w-[35%]">
-              <Card className="h-[28rem] w-full rounded-2xl bg-slate-200 p-6 shadow-md shadow-slate-950/20">
-                <Text className="text-2xl font-semibold text-slate-900">Details</Text>
-                <Text className="mt-3 text-sm text-slate-600">
-                  This smaller panel can hold supporting information or quick actions.
-                </Text>
+              <Card className="h-[20%] w-full rounded-2xl bg-slate-100 p-6 shadow-md shadow-slate-950/20">
+                <Text className="text-2xl text-center font-semibold text-slate-900">Upcoming Live Hangout</Text>
+                <Box className='flex-row gap-3 justify-center'>
+                  <Avatar className='h-20 w-20 md:p-6'>
+                  <AvatarImage
+                    source={{
+                      uri: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxzZWFyY2h8Mnx8dXNlcnxlbnwwfHwwfHw%3D&auto=format&fit=crop&w=800&q=60',
+                    }}
+                  />
+                  </Avatar>
+                  <Box className='gap-3 md:p-2'>
+                    <Text className='text-gray'>
+                      Topic
+                    </Text>
+                    <Text className='text-xl font-semibold'>
+                      Tech Market Pricing in Nigeria
+                    </Text>
+                  </Box>
+                </Box>
+                <Box className='gap-3 items-center justify-between '>
+                  <Text className='text-gray'>
+                    Starts In
+                  </Text>
+                  <Text className='text-xl font-bold'>
+                    05: 56: 43
+                  </Text>
+                  <Button className='mt-4 w-[60%] h-[35%]'>
+                    <Text className='text-xl text-white'>
+                      Set Reminder
+                    </Text>
+                  </Button>
+                </Box>
+
               </Card>
+
+              <Box className='h-[5%] w-full rounded-2xl mt-10 p-6 shadow-md shadow-slate-950/10'>
+                <Text>
+                  Join our new letter
+                </Text>
+              </Box>
             </Box>
+
+            
           </Box>
         </Box>
       </Box>
