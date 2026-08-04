@@ -1,0 +1,103 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities; 
+
+:root {
+  --background: #f8fafc;
+  --foreground: #0f172a;
+
+  --primary: #10b981;
+  --primary-foreground: #ffffff;
+
+  --sidebar: #0b192c;
+  --sidebar-foreground: #ffffff;
+
+  --card: #ffffff;
+  --card-foreground: #0f172a;
+
+  --border: #e2e8f0;
+
+  --gray: #a3a6ad;
+  --gray-foreground: #f8fafc;
+
+  /* Plain CSS custom properties — Tailwind v3 has no @theme at-rule,
+     so these must be declared here (not inside @theme) to actually
+     take effect. tailwind.config.js's fontFamily.sans/mono reference
+     these by name. */
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+html,
+body {
+  min-height: 100%;
+  background-color: var(--background);
+  color: var(--foreground);
+}
+
+body {
+  font-family: var(--font-sans), ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+.welcome-card {
+  background: linear-gradient(135deg, #fef3c7 0%, #ffedd5 46%, #10b9815c 100%);
+  animation: welcomeFloat 3s ease-in-out infinite;
+}
+
+.welcome-badge {
+  animation: welcomeGlow 2s ease-in-out infinite;
+}
+
+.welcome-dot {
+  animation: welcomePulse 1.4s ease-in-out infinite;
+}
+
+@keyframes welcomeFloat {
+  0%,
+  100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-3px);
+  }
+}
+
+@keyframes welcomeGlow {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(245, 158, 11, 0.08);
+  }
+}
+
+@keyframes welcomePulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.16);
+    opacity: 0.8;
+  }
+}
