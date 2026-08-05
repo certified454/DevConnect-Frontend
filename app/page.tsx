@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, type MouseEvent } from 'react';
+import Image from 'next/image';
 import NaijaStates from 'naija-state-local-government';
 import { Box } from '@/components/ui/box';
 import { Text } from '@/components/ui/text';
@@ -115,98 +116,124 @@ export default function Home() {
         <Box className="hidden md:block md:w-64 md:shrink-0" />
 
         {/* Main content */}
-        <Box className="flex-1 p-2 md:ml-2 md:p-6">
-          <div className="welcome-card mb-2 overflow-hidden rounded-3xl border border-amber-100 p-5 shadow-sm shadow-amber-100/70 md:mb-2 md:p-6">
-            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-              <div className=" flex flex-col gap-1">
-                <Text className="text-sl font-semibold uppercase tracking-[0.24em] text-amber-600">
+        <Box className="flex-1 px-3 pb-3 md:ml-2 md:p-6">
+          {/* ── Sticky top group: mobile logo bar + filter bar ────────────── */}
+          <div className="sticky top-0 z-40">
+            {/* Mobile-only top bar with logo + menu button */}
+            <div className="flex items-center justify-between border-b border-slate-200/70 bg-white/95 px-4 py-3 backdrop-blur-md md:hidden">
+              <button
+                type="button"
+                onClick={() => setMobileOpen(true)}
+                aria-label="Open navigation"
+                className="rounded-md p-2 text-slate-700 hover:bg-slate-100"
+              >
+                <MenuIcon className="h-5 w-5" />
+              </button>
+              <Box className=" flex-row ml-auto items-center">
+                <Text className="text-primary text-lg font-semibold">DevConnect</Text>
+                <Icon as={SunIcon} className="h-7 w-7 ml-3 text-amber-500" />
+              </Box>
+              {/* Spacer matching the button's width so the logo stays visually centered */}
+              <div className="w-9" />
+            </div>
+
+            <Box className="-mx-4 border-b border-slate-200/70 bg-white/90 px-4 py-3 backdrop-blur-md md:-mx-10 md:px-10 md:py-4">
+              <Box className="flex-row items-center gap-3">
+                <Box className="flex-row items-center gap-2">
+                  <Icon as={GlobeIcon} className="h-4 w-4 text-emerald-600" />
+                  <Text className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Filter by state:
+                  </Text>
+                </Box>
+
+                <Select
+                  selectedValue={selectedState}
+                  onValueChange={(value: any) => setSelectedState(value)}
+                >
+                  <SelectTrigger
+                    variant="outline"
+                    size="sm"
+                    className="w-44 rounded-full border-slate-200 bg-white px-4 py-1.5 data-[focus=true]:border-emerald-400 data-[focus=true]:ring-2 data-[focus=true]:ring-emerald-100"
+                  >
+                    <SelectInput
+                      placeholder="All States"
+                      value={selectedState === 'all' ? 'All States' : selectedState}
+                      className="text-sm font-medium text-slate-700"
+                    />
+                    <SelectIcon className="mr-3" as={ChevronDownIcon} />
+                  </SelectTrigger>
+                  <SelectPortal>
+                    <SelectBackdrop />
+                    <SelectContent className="max-h-[70vh] scrollbar-hide rounded-t-2xl border-t border-slate-100 px-2 pb-6 md:max-h-96 md:rounded-2xl md:border md:p-2 md:shadow-xl md:shadow-slate-950/10">
+                      <SelectDragIndicatorWrapper className="py-3">
+                        <SelectDragIndicator className="bg-slate-200" />
+                      </SelectDragIndicatorWrapper>
+
+                      <SelectItem
+                        label="All States"
+                        value="all"
+                        className="mx-1 mb-1 rounded-lg border-b border-slate-100 px-3 py-2.5 text-sm font-medium text-slate-700 data-[highlighted=true]:bg-emerald-50 data-[highlighted=true]:text-emerald-700"
+                      />
+
+                      {nigerianStates.map((state) => (
+                        <SelectItem
+                          key={state}
+                          label={state}
+                          value={state}
+                          className="mx-1 rounded-lg px-3 py-2.5 text-sm text-slate-600 data-[highlighted=true]:bg-emerald-50 data-[highlighted=true]:text-emerald-700"
+                        />
+                      ))}
+                    </SelectContent>
+                  </SelectPortal>
+                </Select>
+              </Box>
+            </Box>
+          </div>
+
+          {/* ── Welcome card ──────────────────────────
+              Smaller padding/rounding/text on mobile via base classes;
+              md: classes restore the original desktop sizing exactly,
+              so desktop is unchanged.
+          */}
+          <div className="welcome-card relative mt-3 mb-3 overflow-hidden rounded-2xl border border-amber-100 p-3 shadow-sm shadow-amber-100/70 md:mb-2 md:rounded-3xl md:p-6">
+
+            <div className="relative flex flex-col gap-2 md:flex-row md:items-center md:justify-between md:gap-3">
+              <div className="flex flex-col gap-1">
+                <Text className="text-[15px] tracking-[0.20em] md:text-xl md:tracking-[0.24em] font-bold uppercase text-amber-600">
                   Welcome to DevConnect
                 </Text>
-                <Text className="text-sm text-slate-900">
-                Here developers connect, share knowledge, fix problems, and collaborate on projects.
-              </Text>
-              <Text className="text-sm text-slate-900">
-                explore discussions, join communities, and stay updated with the latest in the tech world
-              </Text>
+                <Text className="text-[13px] text-slate-900 md:text-sl">
+                  Here developers connect, share knowledge, fix problems, and collaborate on projects. Explore discussions, join communities, and stay updated with the latest in the tech world.
+                </Text>
               </div>
-                
-              <div className="flex flex-col justify-center gap-3 md:items-center">
-                <div className="welcome-badge flex items-center gap-2 rounded-full bg-white/80 px-3 py-2 shadow-sm">
-                  <span className="welcome-dot h-2.5 w-2.5 rounded-full bg-amber-500" />
-                  <Text className="text-sm font-medium text-slate-700">
+
+              <div className="flex flex-col items-center justify-center gap-2 md:gap-3">
+                <div className="welcome-badge flex items-center gap-1.5 rounded-full bg-white/80 px-2.5 py-1.5 shadow-sm md:gap-2 md:px-3 md:py-2">
+                  <span className="welcome-dot h-2 w-2 rounded-full bg-amber-500 md:h-2.5 md:w-2.5" />
+                  <Text className="text-xs font-medium text-slate-700 md:text-sm">
                     Fresh conversations are live
                   </Text>
                 </div>
 
-                <Pressable className="mt-3 w-40 items-center rounded-full bg-amber-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition duration-200 hover:bg-amber-700 md:mt-0">
-                  <Text className="text-sl font-semibold text-white">Sign In</Text>
+                <Pressable className="mt-1 w-32 items-center rounded-full bg-amber-600 px-3 py-1.5 shadow-sm transition duration-200 hover:bg-amber-700 md:mt-0 md:w-40 md:px-4 md:py-2">
+                  <Text className="text-xs font-semibold text-white md:text-sm">Sign In</Text>
                 </Pressable>
               </div>
-              
             </div>
           </div>
 
-          <Box className="sticky top-0 z-30 -mx-4 border-b border-slate-200/70 bg-white/90 px-4 py-3 pl-16 backdrop-blur-md md:-mx-10 md:px-10 md:py-4 md:pl-10">
-            <Box className="flex-row items-center gap-3">
-              <Box className="flex-row items-center gap-2">
-                <Icon as={GlobeIcon} className="h-4 w-4 text-emerald-600" />
-                <Text className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  Filter by state:
-                </Text>
-              </Box>
-
-              <Select
-                selectedValue={selectedState}
-                onValueChange={(value: any) => setSelectedState(value)}
-              >
-                <SelectTrigger
-                  variant="outline"
-                  size="sm"
-                  className="w-44 rounded-full border-slate-200 bg-white px-4 py-1.5 data-[focus=true]:border-emerald-400 data-[focus=true]:ring-2 data-[focus=true]:ring-emerald-100"
-                >
-                  <SelectInput
-                    placeholder="All States"
-                    value={selectedState === 'all' ? 'All States' : selectedState}
-                    className="text-sm font-medium text-slate-700"
-                  />
-                  <SelectIcon className="mr-3" as={ChevronDownIcon} />
-                </SelectTrigger>
-                <SelectPortal>
-                  <SelectBackdrop />
-                  <SelectContent className="max-h-[70vh] scrollbar-hide rounded-t-2xl border-t border-slate-100 px-2 pb-6 md:max-h-96 md:rounded-2xl md:border md:p-2 md:shadow-xl md:shadow-slate-950/10">
-                    <SelectDragIndicatorWrapper className="py-3">
-                      <SelectDragIndicator className="bg-slate-200" />
-                    </SelectDragIndicatorWrapper>
-
-                    <SelectItem
-                      label="All States"
-                      value="all"
-                      className="mx-1 mb-1 rounded-lg border-b border-slate-100 px-3 py-2.5 text-sm font-medium text-slate-700 data-[highlighted=true]:bg-emerald-50 data-[highlighted=true]:text-emerald-700"
-                    />
-
-                    {nigerianStates.map((state) => (
-                      <SelectItem
-                        key={state}
-                        label={state}
-                        value={state}
-                        className="mx-1 rounded-lg px-3 py-2.5 text-sm text-slate-600 data-[highlighted=true]:bg-emerald-50 data-[highlighted=true]:text-emerald-700"
-                      />
-                    ))}
-                  </SelectContent>
-                </SelectPortal>
-              </Select>
-            </Box>
-          </Box>
-
           <Box className="flex flex-col gap-4 md:flex-row md:gap-6">
-            <VStack className="w-full md:w-[65%] gap-6">
+            {/* Posts column — order-2 on mobile so the sidebar (Upcoming
+                Hangout) shows first without scrolling; order-1 on desktop
+                restores the original left-column position. */}
+            <VStack className="order-2 w-full gap-4 md:order-1 md:w-[60%]">
               {/* Feed posts */}
               {visiblePosts.map((post) => (
                 <Card
                   key={post.name}
                   className="w-full rounded-2xl bg-slate-100 p-6 shadow-md shadow-slate-950/20"
                 >
-                  <Box className="mb-3 flex-row items-center justify-between">
+                  <Box className=" flex-row items-center justify-between">
                     <Box className="flex-row items-center gap-3">
                       <Avatar>
                         <AvatarImage source={{ uri: post.avatar }} />
@@ -243,10 +270,10 @@ export default function Home() {
                     </Popover>
                   </Box>
 
-                  <Text className="text-3xl font-bold text-slate-900">
+                  <Text className="text-xl md:text-3xl font-bold text-slate-900">
                     Internet Service Providers and Local Devs
                   </Text>
-                  <Text className="mt-3 text-sm text-slate-600">
+                  <Text className="text-xs text-slate-600 md:text-sm">
                     Nigerian developers are out here building world-class fintechs, SaaS platforms, and mobile
                     apps—while waging a daily war against latency, packet loss, and data costs. From switching
                     between 4G/5G mobile networks, fiber providers, and Starlink to optimizing apps for slow
@@ -283,61 +310,64 @@ export default function Home() {
               )}
             </VStack>
 
-            <Box className="w-full md:w-[35%]">
-              <Card className="h-[20%] w-full rounded-2xl bg-slate-100 p-6 shadow-md shadow-slate-950/20">
-                <Text className="text-2xl text-center font-semibold text-slate-900">Upcoming Live Hangout</Text>
-                <Box className='flex-row gap-3 justify-center'>
-                  <Avatar className='h-20 w-20 md:p-6'>
-                  <AvatarImage
-                    source={{
-                      uri: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxzZWFyY2h8Mnx8dXNlcnxlbnwwfHwwfHw%3D&auto=format&fit=crop&w=800&q=60',
-                    }}
-                  />
+            {/* Sidebar — order-1 on mobile so it appears right after the
+                welcome card, before the posts feed. order-2 on desktop
+                restores the original right-column position. Percentage
+                heights (h-[20%]/h-[5%]) removed — those had no defined
+                parent height to resolve against, which is what caused the
+                cards to collapse and overlap whenever the posts column
+                was short (e.g. "no posts found" for a filtered state).
+                Auto height driven by padding + content is used instead,
+                so this can never break regardless of how many posts show.
+            */}
+            <Box className="order-1 w-full md:order-2 md:w-[35%]">
+              <Card className="w-full rounded-2xl bg-slate-100 p-4 shadow-md shadow-slate-950/20 md:p-6">
+                <Text className="text-center text-lg font-semibold text-slate-900 md:text-2xl">
+                  Upcoming Live Hangout
+                </Text>
+                <Box className="flex-row items-center gap-3 justify-center mt-2 md:mt-3">
+                  <Avatar className="h-14 w-14 md:h-20 md:w-20">
+                    <AvatarImage
+                      source={{
+                        uri: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxzZWFyY2h8Mnx8dXNlcnxlbnwwfHwwfHw%3D&auto=format&fit=crop&w=800&q=60',
+                      }}
+                    />
                   </Avatar>
-                  <Box className='gap-3 md:p-2'>
-                    <Text className='text-gray'>
+                  <Box className="gap-1 md:gap-3">
+                    <Text className="text-xs text-gray md:text-base">
                       Topic
                     </Text>
-                    <Text className='text-xl font-semibold'>
+                    <Text className="text-sm font-semibold md:text-xl">
                       Tech Market Pricing in Nigeria
                     </Text>
                   </Box>
                 </Box>
-                <Box className='gap-3 items-center justify-between '>
-                  <Text className='text-gray'>
+                <Box className="gap-2 items-center justify-between mt-3 md:gap-3 md:mt-4">
+                  <Text className="text-xs text-gray md:text-base">
                     Starts In
                   </Text>
-                  <Text className='text-xl font-bold'>
+                  <Text className="text-lg font-bold md:text-xl">
                     05: 56: 43
                   </Text>
-                  <Button className='mt-4 w-[60%] h-[35%]'>
-                    <Text className='text-xl text-white'>
+                  <Button className="mt-2 w-[70%] py-2 md:mt-4 md:w-[60%] md:py-3">
+                    <Text className="text-sm text-white md:text-xl">
                       Set Reminder
                     </Text>
                   </Button>
                 </Box>
-
               </Card>
 
-              <Box className='h-[5%] w-full rounded-2xl mt-10 p-6 shadow-md shadow-slate-950/10'>
-                <Text>
+              <Box className="w-full rounded-2xl mt-3 p-4 shadow-md shadow-slate-950/10 md:mt-10 md:p-6">
+                <Text className="text-sm md:text-base">
                   Join our new letter
                 </Text>
               </Box>
             </Box>
-
-            
           </Box>
         </Box>
       </Box>
 
-      {/* ── Mobile drawer, toggle, and backdrop ──────────────────────────
-          Rendered as siblings AFTER the main flex row above, at the same
-          nesting level as the outermost Box. Since they come later in DOM
-          order and aren't nested inside a lower-z Box, they naturally paint
-          above the main content on mobile without fighting z-index across
-          separate stacking contexts. 
-      */}
+      {/* ── Mobile drawer and backdrop ────────────────────────── */}
 
       <div
         className={`fixed inset-y-0 left-0 z-50 w-72 -translate-x-full transform bg-slate-900 text-white shadow-2xl shadow-slate-950/30 transition-transform duration-300 ease-out md:w-64 md:translate-x-0 md:shadow-none ${
@@ -365,7 +395,7 @@ export default function Home() {
                 key={item.label}
                 href={item.href}
                 onClick={() => setMobileOpen(false)}
-                className="flex items-center gap-3 rounded-lg px-4 py-3 text-sl font-medium text-slate-300 transition duration-200 hover:bg-slate-800 hover:text-white"
+                className="flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium text-slate-300 transition duration-200 hover:bg-slate-800 hover:text-white"
               >
                 <span className="text-emerald-400">{item.icon}</span>
                 <span className="">{item.label}</span>
@@ -390,15 +420,6 @@ export default function Home() {
           </Box>
         </Box>
       </div>
-
-      <button
-        type="button"
-        className="fixed left-4 top-4 z-[60] rounded-md border border-slate-200 bg-white p-2 text-slate-700 shadow-sm md:hidden"
-        onClick={() => setMobileOpen(true)}
-        aria-label="Open navigation"
-      >
-        <MenuIcon className="h-5 w-5" />
-      </button>
 
       {mobileOpen ? (
         <button
