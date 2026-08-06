@@ -115,7 +115,6 @@ function SiteFooter({ className = '' }: { className?: string }) {
         <Box className="flex flex-col gap-1.5">
           <Text className="text-[11px] font-bold text-slate-100 uppercase tracking-wider">Company</Text>
           <a href="#about" className="text-[11px] text-slate-400 hover:text-emerald-400 transition-colors">About Us</a>
-          <a href="#careers" className="text-[11px] text-slate-400 hover:text-emerald-400 transition-colors">Careers</a>
           <a href="#privacy" className="text-[11px] text-slate-400 hover:text-emerald-400 transition-colors">Privacy</a>
           <a href="#terms" className="text-[11px] text-slate-400 hover:text-emerald-400 transition-colors">Terms</a>
         </Box>
