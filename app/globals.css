@@ -28,11 +28,20 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+.dark {
+  --background: #0a0a0a;
+  --foreground: #ededed;
+  --card: #111827;
+  --card-foreground: #e2e8f0;
+  --border: #334155;
+  --input: #1e293b;
+  --ring: #2563eb;
+  --popover: #0f172a;
+  --popover-foreground: #f8fafc;
+  --muted: #111827;
+  --muted-foreground: #e2e8f0;
+  --sidebar: #020617;
+  --sidebar-foreground: #e2e8f0;
 }
 
 html,
