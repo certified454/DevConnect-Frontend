@@ -106,7 +106,7 @@ function SiteFooter({ className = '' }: { className?: string }) {
             NG
           </span>
         </Box>
-        <Text className="text-[10px] text-slate-500">v1.0.4</Text>
+        <Text className="text-[10px] text-slate-500">v1.0</Text>
       </Box>
 
       {/* Link Columns */}
