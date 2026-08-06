@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, type MouseEvent } from 'react';
-import Image from 'next/image';
 import NaijaStates from 'naija-state-local-government';
 import { Box } from '@/components/ui/box';
 import { Text } from '@/components/ui/text';
@@ -19,7 +18,6 @@ import {
 } from '@/components/ui/icon';
 import {
   Avatar,
-  AvatarFallbackText,
   AvatarImage,
 } from '@/components/ui/avatar';
 import { Card } from '@/components/ui/card';
@@ -46,7 +44,7 @@ import {
 import { Pressable } from 'react-native';
 import { Button, ButtonText } from '@/components/ui/button';
 
-// Dummy data for navigation items
+// Navigation items
 const navItems = [
   { label: 'Home', href: '#home', icon: <GlobeIcon className="h-5 w-5" /> },
   { label: 'Hangout', href: '#hangout', icon: <CalendarDaysIcon className="h-5 w-5" /> },
@@ -54,10 +52,8 @@ const navItems = [
   { label: 'Hub', href: '#hub', icon: <SunIcon className="h-5 w-5" /> },
 ];
 
-// Nigerian states used for the filter
 const nigerianStates = NaijaStates.states();
 
-//dummy data for feed posts and tags
 const feedPosts = [
   {
     name: 'Sighter',
@@ -96,6 +92,63 @@ const feedPosts = [
 
 const tags = ["#today'stopic", '#Devwahala', '#dev', '#NgPower'];
 
+/**
+ * Detailed SportyBet-style dark footer card component.
+ */
+function SiteFooter({ className = '' }: { className?: string }) {
+  return (
+    <Box className={`bg-slate-900 border border-slate-800 p-4 rounded-2xl text-slate-300 ${className}`}>
+      {/* Brand Header */}
+      <Box className="flex-row items-center justify-between border-b border-slate-800 pb-3 mb-3">
+        <Box className="flex-row items-center gap-2">
+          <Text className="text-emerald-400 font-bold text-base">DevConnect</Text>
+          <span className="text-[10px] bg-emerald-950 text-emerald-400 border border-emerald-800 px-2 py-0.5 rounded-full font-medium">
+            NG
+          </span>
+        </Box>
+        <Text className="text-[10px] text-slate-500">v1.0.4</Text>
+      </Box>
+
+      {/* Link Columns */}
+      <Box className="grid grid-cols-3 gap-2 mb-4 text-left">
+
+        <Box className="flex flex-col gap-1.5">
+          <Text className="text-[11px] font-bold text-slate-100 uppercase tracking-wider">Company</Text>
+          <a href="#about" className="text-[11px] text-slate-400 hover:text-emerald-400 transition-colors">About Us</a>
+          <a href="#careers" className="text-[11px] text-slate-400 hover:text-emerald-400 transition-colors">Careers</a>
+          <a href="#privacy" className="text-[11px] text-slate-400 hover:text-emerald-400 transition-colors">Privacy</a>
+          <a href="#terms" className="text-[11px] text-slate-400 hover:text-emerald-400 transition-colors">Terms</a>
+        </Box>
+
+        <Box className="flex flex-col gap-1.5">
+          <Text className="text-[11px] font-bold text-slate-100 uppercase tracking-wider">Community</Text>
+          <a href="#rules" className="text-[11px] text-slate-400 hover:text-emerald-400 transition-colors">Guidelines</a>
+          <a href="#topics" className="text-[11px] text-slate-400 hover:text-emerald-400 transition-colors">Topics</a>
+          <a href="#help" className="text-[11px] text-slate-400 hover:text-emerald-400 transition-colors">Support</a>
+          <a href="#faq" className="text-[11px] text-slate-400 hover:text-emerald-400 transition-colors">FAQs</a>
+        </Box>
+
+        <Box className="flex flex-col gap-1.5">
+          <Text className="text-[11px] font-bold text-slate-100 uppercase tracking-wider">Connect</Text>
+          <a href="#contact" className="text-[11px] text-slate-400 hover:text-emerald-400 transition-colors">Contact</a>
+          <a href="#socials" className="text-[11px] text-slate-400 hover:text-emerald-400 transition-colors">Socials</a>
+          <a href="#newsletter" className="text-[11px] text-slate-400 hover:text-emerald-400 transition-colors">Newsletter</a>
+        </Box>
+      </Box>
+
+      {/* Footer Tagline & Copyright */}
+      <Box className="border-t border-slate-800/80 pt-3 flex flex-col gap-1">
+        <Text className="text-[10px] text-slate-400 leading-tight">
+          Nigeria's premier tech hub for developers, creators, and innovators.
+        </Text>
+        <Text className="text-[9px] text-slate-500 mt-1">
+          © {new Date().getFullYear()} DevConnect Tech Ltd. All rights reserved.
+        </Text>
+      </Box>
+    </Box>
+  );
+}
+
 export default function Home() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [selectedState, setSelectedState] = useState('all');
@@ -111,16 +164,16 @@ export default function Home() {
 
   return (
     <Box className="min-h-screen bg-slate-50 text-slate-900">
-      <Box className="flex min-h-screen flex-col md:flex-row">
-        {/* Desktop sidebar spacer — reserves horizontal space in the flex row on desktop. */}
+      <Box className="flex min-h-screen flex-col md:h-screen md:flex-row md:overflow-hidden">
+        {/* Desktop Left Sidebar Spacer */}
         <Box className="hidden md:block md:w-64 md:shrink-0" />
 
-        {/* Main content */}
-        <Box className="flex-1 px-3 pb-3 md:ml-2 md:p-6">
-          {/* ── Sticky top group: mobile logo bar + filter bar ────────────── */}
-          <div className="sticky top-0 z-40">
-            {/* Mobile-only top bar with logo + menu button */}
-            <div className="flex items-center justify-between border-b border-slate-200/70 bg-white/95 px-4 py-3 backdrop-blur-md md:hidden">
+        {/* Main Content Area */}
+        <Box className="flex-1 px-3 pb-8 md:ml-2 md:h-screen md:overflow-hidden md:p-6">
+          {/* Top Zone: Fixed Header on desktop, Sticky Header on mobile */}
+          <div className="sticky top-0 z-40 bg-slate-50/95 backdrop-blur-md border-b border-slate-200/70 md:relative md:border-b-0 md:bg-transparent">
+            {/* Mobile Top Navigation Bar */}
+            <div className="flex items-center justify-between border-b border-slate-200/70 bg-white/95 px-4 py-3 md:hidden">
               <button
                 type="button"
                 onClick={() => setMobileOpen(true)}
@@ -129,15 +182,15 @@ export default function Home() {
               >
                 <MenuIcon className="h-5 w-5" />
               </button>
-              <Box className=" flex-row ml-auto items-center">
-                <Text className="text-primary text-lg font-semibold">DevConnect</Text>
-                <Icon as={SunIcon} className="h-7 w-7 ml-3 text-amber-500" />
+              <Box className="flex-row ml-auto items-center">
+                <Text className="text-prima text-lg font-semibold">DevConnect</Text>
+                <img src="/icon/logo.png" className="h-10 w-10 rounded-[8em] ml-2" />
               </Box>
-              {/* Spacer matching the button's width so the logo stays visually centered */}
               <div className="w-9" />
             </div>
 
-            <Box className="-mx-4 border-b border-slate-200/70 bg-white/90 px-4 py-3 backdrop-blur-md md:-mx-10 md:px-10 md:py-4">
+            {/* State Filter Bar */}
+            <Box className="px-4 py-3 bg-white/95 backdrop-blur-md md:rounded-2xl md:bg-white md:border md:border-slate-200/70 md:px-6 md:py-3.5 md:mb-3">
               <Box className="flex-row items-center gap-3">
                 <Box className="flex-row items-center gap-2">
                   <Icon as={GlobeIcon} className="h-4 w-4 text-emerald-600" />
@@ -190,28 +243,23 @@ export default function Home() {
             </Box>
           </div>
 
-          {/* ── Welcome card ──────────────────────────
-              Smaller padding/rounding/text on mobile via base classes;
-              md: classes restore the original desktop sizing exactly,
-              so desktop is unchanged.
-          */}
-          <div className="welcome-card relative mt-3 mb-3 overflow-hidden rounded-2xl border border-amber-100 p-3 shadow-sm shadow-amber-100/70 md:mb-2 md:rounded-3xl md:p-6">
-
+          {/* Welcome Card Banner */}
+          <div className="welcome-card relative mt-3 mb-3 overflow-hidden rounded-2xl border border-amber-100 p-3 shadow-sm shadow-amber-100/70 md:mb-4 md:rounded-3xl md:p-6 bg-gradient-to-r from-amber-50/50 to-emerald-50/50">
             <div className="relative flex flex-col gap-2 md:flex-row md:items-center md:justify-between md:gap-3">
               <div className="flex flex-col gap-1">
                 <Text className="text-[15px] tracking-[0.20em] md:text-xl md:tracking-[0.24em] font-bold uppercase text-amber-600">
                   Welcome to DevConnect
                 </Text>
-                <Text className="text-[13px] text-slate-900 md:text-sl">
-                  Here developers connect, share knowledge, fix problems, and collaborate on projects. Explore discussions, join communities, and stay updated with the latest in the tech world.
+                <Text className="text-[13px] text-slate-900 md:text-sm">
+                  Here developers connect, share knowledge, fix problems, collaborate on projects, explore discussions, join communities, and stay updated with the latest in the tech world.
                 </Text>
               </div>
 
-              <div className="flex flex-col items-center justify-center gap-2 md:gap-3">
+              <div className="flex w-auto flex-col items-center justify-center gap-2 md:gap-3">
                 <div className="welcome-badge flex items-center gap-1.5 rounded-full bg-white/80 px-2.5 py-1.5 shadow-sm md:gap-2 md:px-3 md:py-2">
                   <span className="welcome-dot h-2 w-2 rounded-full bg-amber-500 md:h-2.5 md:w-2.5" />
-                  <Text className="text-xs font-medium text-slate-700 md:text-sm">
-                    Fresh conversations are live
+                  <Text className="text-sm font-medium text-slate-700 md:text-xs">
+                    It only takes a minute to sign in and start connecting with other developers!
                   </Text>
                 </div>
 
@@ -222,25 +270,23 @@ export default function Home() {
             </div>
           </div>
 
-          <Box className="flex flex-col gap-4 md:flex-row md:gap-6">
-            {/* Posts column — order-2 on mobile so the sidebar (Upcoming
-                Hangout) shows first without scrolling; order-1 on desktop
-                restores the original left-column position. */}
-            <VStack className="order-2 w-full gap-4 md:order-1 md:w-[60%]">
-              {/* Feed posts */}
+          {/* Grid/Flex Layout for Feed & Sidebar */}
+          <Box className="flex flex-col gap-4 md:min-h-0 md:flex-1 md:flex-row md:gap-6">
+            {/* Infinite Feed Column */}
+            <VStack className="order-2 w-full gap-4 md:order-1 md:h-full md:w-[63%] md:min-h-0 md:overflow-y-auto md:pr-2 md:pb-6 scrollbar-hide">
               {visiblePosts.map((post) => (
                 <Card
                   key={post.name}
-                  className="w-full rounded-2xl bg-slate-100 p-6 shadow-md shadow-slate-950/20"
+                  className="w-full shadow shadow-slate-200 rounded-2xl bg-white border border-slate-100 p-5"
                 >
-                  <Box className=" flex-row items-center justify-between">
+                  <Box className="flex-row items-center justify-between">
                     <Box className="flex-row items-center gap-3">
                       <Avatar>
                         <AvatarImage source={{ uri: post.avatar }} />
                       </Avatar>
                       <Box>
                         <Text className="font-semibold">{post.name}</Text>
-                        <Text className="text-sm text-gray">3 hr ago · {post.state}</Text>
+                        <Text className="text-sm text-gray-500">3 hr ago · {post.state}</Text>
                       </Box>
                     </Box>
                     <Popover
@@ -250,7 +296,7 @@ export default function Home() {
                       placement="bottom"
                       trigger={(triggerProps) => {
                         return (
-                          <Button className='bg-slate-950/10' {...triggerProps}>
+                          <Button className='bg-slate-100 rounded-full p-2' {...triggerProps}>
                             <ButtonText>
                               <Icon as={ThreeDotsIcon} className="h-5 w-5 text-black" />
                             </ButtonText>
@@ -263,17 +309,17 @@ export default function Home() {
                         <PopoverArrow />
                         <PopoverBody>
                           <Text className="text-foreground">
-                             Skip this post
+                            Skip this post
                           </Text>
                         </PopoverBody>
                       </PopoverContent>
                     </Popover>
                   </Box>
 
-                  <Text className="text-xl md:text-3xl font-bold text-slate-900">
+                  <Text className="text-xl md:text-2xl font-bold text-slate-900 mt-3 mb-2">
                     Internet Service Providers and Local Devs
                   </Text>
-                  <Text className="text-xs text-slate-600 md:text-sm">
+                  <Text className="text-xs text-slate-600 md:text-sm leading-relaxed">
                     Nigerian developers are out here building world-class fintechs, SaaS platforms, and mobile
                     apps—while waging a daily war against latency, packet loss, and data costs. From switching
                     between 4G/5G mobile networks, fiber providers, and Starlink to optimizing apps for slow
@@ -286,15 +332,14 @@ export default function Home() {
                     {tags.map((tag) => (
                       <Card
                         key={tag}
-                        className="bg-primary items-center justify-center rounded-full px-4 py-1.5 shadow-none"
+                        className="bg-emerald-50 text-emerald-700 items-center justify-center rounded-full px-3 py-1 border border-emerald-100 shadow-none"
                       >
-                        <Text className="text-primary-foreground text-xs font-medium">{tag}</Text>
+                        <Text className="text-emerald-700 text-xs font-medium">{tag}</Text>
                       </Card>
                     ))}
                   </Box>
 
-                  <Box className="mt-3 flex-row items-center justify-end gap-5 border-t border-slate-200/70 pt-3">
-
+                  <Box className="mt-3 flex-row items-center justify-end gap-5 border-t border-slate-100 pt-3">
                     <Box className="flex-row items-center gap-1.5">
                       <Icon as={EyeIcon} className="h-4 w-4 text-slate-400" />
                       <Text className="text-xs font-medium text-slate-500">{post.views}</Text>
@@ -304,81 +349,80 @@ export default function Home() {
               ))}
 
               {visiblePosts.length === 0 && (
-                <Card className="w-full rounded-2xl bg-slate-100 p-6 shadow-md shadow-slate-950/20">
+                <Card className="w-full rounded-2xl bg-white p-6 border border-slate-100 shadow-sm">
                   <Text className="text-slate-500">No posts found for {selectedState}.</Text>
                 </Card>
               )}
             </VStack>
 
-            {/* Sidebar — order-1 on mobile so it appears right after the
-                welcome card, before the posts feed. order-2 on desktop
-                restores the original right-column position. Percentage
-                heights (h-[20%]/h-[5%]) removed — those had no defined
-                parent height to resolve against, which is what caused the
-                cards to collapse and overlap whenever the posts column
-                was short (e.g. "no posts found" for a filtered state).
-                Auto height driven by padding + content is used instead,
-                so this can never break regardless of how many posts show.
-            */}
-            <Box className="order-1 w-full md:order-2 md:w-[35%]">
-              <Card className="w-full rounded-2xl bg-slate-100 p-4 shadow-md shadow-slate-950/20 md:p-6">
-                <Text className="text-center text-lg font-semibold text-slate-900 md:text-2xl">
-                  Upcoming Live Hangout
-                </Text>
-                <Box className="flex-row items-center gap-3 justify-center mt-2 md:mt-3">
-                  <Avatar className="h-14 w-14 md:h-20 md:w-20">
+            {/* Right Sidebar (Upcoming Hangout & Desktop Footer) */}
+            <Box className="order-1 w-full flex flex-col gap-4 md:order-2 md:h-full md:w-[35%] md:overflow-y-auto scrollbar-hide">
+              {/* Hangout Card */}
+              <Card className="w-full shadow shadow-slate-200 rounded-2xl bg-white border border-slate-100 p-4 shadow-sm">
+                <Box className="flex-row items-center justify-between md:block">
+                  <Text className="text-sm font-semibold text-slate-900 md:text-center md:text-base">
+                    Upcoming Live Hangout
+                  </Text>
+                  <Text className="text-xs font-bold text-emerald-700 md:hidden">
+                    05:56:43
+                  </Text>
+                </Box>
+
+                <Box className="flex-row items-center gap-3 mt-3 md:justify-center">
+                  <Avatar className="h-10 w-10 md:h-12 md:w-12">
                     <AvatarImage
                       source={{
                         uri: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxzZWFyY2h8Mnx8dXNlcnxlbnwwfHwwfHw%3D&auto=format&fit=crop&w=800&q=60',
                       }}
                     />
                   </Avatar>
-                  <Box className="gap-1 md:gap-3">
-                    <Text className="text-xs text-gray md:text-base">
+                  <Box className="min-w-0 flex-1 gap-0.5 md:flex-none md:text-center">
+                    <Text className="text-[10px] text-slate-400 md:text-xs">
                       Topic
                     </Text>
-                    <Text className="text-sm font-semibold md:text-xl">
+                    <Text className="truncate text-xs font-semibold text-slate-900 md:text-sm">
                       Tech Market Pricing in Nigeria
                     </Text>
                   </Box>
+                  <Button className="h-7 shrink-0 rounded-full px-3 py-0 bg-emerald-600 md:hidden">
+                    <ButtonText className="text-[11px] font-semibold text-white">
+                      Join
+                    </ButtonText>
+                  </Button>
                 </Box>
-                <Box className="gap-2 items-center justify-between mt-3 md:gap-3 md:mt-4">
-                  <Text className="text-xs text-gray md:text-base">
+
+                <Box className="hidden items-center justify-between gap-2 mt-4 md:flex md:flex-col">
+                  <Text className="text-xs text-slate-400">
                     Starts In
                   </Text>
-                  <Text className="text-lg font-bold md:text-xl">
-                    05: 56: 43
+                  <Text className="text-lg font-bold text-slate-900">
+                    05 : 56 : 43
                   </Text>
-                  <Button className="mt-2 w-[70%] py-2 md:mt-4 md:w-[60%] md:py-3">
-                    <Text className="text-sm text-white md:text-xl">
-                      Set Reminder
+                  <Button className="mt-1 w-full bg-emerald-600 hover:bg-emerald-700 py-2 rounded-xl">
+                    <Text className="text-xs font-semibold text-white">
+                      Join Hangout
                     </Text>
                   </Button>
                 </Box>
               </Card>
 
-              <Box className="w-full rounded-2xl mt-3 p-4 shadow-md shadow-slate-950/10 md:mt-10 md:p-6">
-                <Text className="text-sm md:text-base">
-                  Join our new letter
-                </Text>
-              </Box>
+              {/* Desktop-only Footer aligned right below the Hangout card */}
+              <SiteFooter className="hidden md:block" />
             </Box>
           </Box>
         </Box>
       </Box>
 
-      {/* ── Mobile drawer and backdrop ────────────────────────── */}
-
+      {/* Navigation Drawer Menu (Holds Mobile Footer for easy access) */}
       <div
-        className={`fixed inset-y-0 left-0 z-50 w-72 -translate-x-full transform bg-slate-900 text-white shadow-2xl shadow-slate-950/30 transition-transform duration-300 ease-out md:w-64 md:translate-x-0 md:shadow-none ${
+        className={`fixed inset-y-0 left-0 z-50 w-72 -translate-x-full transform bg-slate-900 text-white shadow-2xl transition-transform duration-300 ease-out md:w-64 md:translate-x-0 md:shadow-none ${
           mobileOpen ? 'translate-x-0' : ''
         }`}
         onClick={(event: MouseEvent<HTMLDivElement>) => event.stopPropagation()}
       >
-        <Box className="flex h-full w-full flex-col p-8">
-          <Box className="mb-10 flex-row w-1000 items-center justify-between">
-            {/* Logo will be only be here on mobile view */}
-            <Text className="text-primary text-xl font-semibold">DevConnect Logo</Text>
+        <Box className="flex h-full w-full flex-col p-6 overflow-y-auto scrollbar-hide">
+          <Box className="mb-6 flex-row items-center justify-between">
+            <Text className="text-emerald-400 text-xl font-bold">DevConnect</Text>
             <button
               type="button"
               className="rounded-md p-2 text-slate-300 hover:bg-slate-800 hover:text-white md:hidden"
@@ -389,42 +433,50 @@ export default function Home() {
             </button>
           </Box>
 
-          <Box className="gap-2">
+          {/* Nav Items */}
+          <Box className="gap-1.5 mb-6">
             {navItems.map((item) => (
               <a
                 key={item.label}
                 href={item.href}
                 onClick={() => setMobileOpen(false)}
-                className="flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium text-slate-300 transition duration-200 hover:bg-slate-800 hover:text-white"
+                className="flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-slate-300 transition duration-200 hover:bg-slate-800 hover:text-white"
               >
                 <span className="text-emerald-400">{item.icon}</span>
-                <span className="">{item.label}</span>
+                <span>{item.label}</span>
               </a>
             ))}
           </Box>
 
-          <Box className="mt-auto rounded-xl border border-slate-800 bg-slate-800/70 p-4">
-            <a className="flex items-center gap-3 rounded-lg py-3 text-sm font-medium text-slate-300 transition duration-200 hover:bg-slate-800 hover:text-white">
-              <Avatar>
+          {/* User Profile Card */}
+          <Box className="mb-6 rounded-xl border border-slate-800 bg-slate-800/60 p-4">
+            <a className="flex items-center gap-3 rounded-lg py-2 text-sm font-medium text-slate-300">
+              <Avatar className="h-8 w-8">
                 <AvatarImage
                   source={{
                     uri: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxzZWFyY2h8Mnx8dXNlcnxlbnwwfHwwfHw%3D&auto=format&fit=crop&w=800&q=60',
                   }}
                 />
               </Avatar>
-              <Text className="text-primary-foreground text-sm">Sighter Tech</Text>
+              <Text className="text-slate-100 text-sm font-semibold">Sighter Tech</Text>
             </a>
-            <a href='' className="mt-3 flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-center text-sm font-medium text-primary-foreground transition duration-200 hover:bg-primary/90">
-                <Text className=" text-sm font-bold ">CREATE A TOPIC</Text>
+            <a href="#create" className="mt-3 flex items-center justify-center rounded-xl bg-emerald-600 px-4 py-2.5 text-center text-xs font-bold text-white transition hover:bg-emerald-700">
+              CREATE A TOPIC
             </a>
+          </Box>
+
+          {/* Mobile Footer Inside Drawer */}
+          <Box className="mt-auto pt-4 border-t border-slate-800 md:hidden">
+            <SiteFooter className="border-0 bg-transparent p-0" />
           </Box>
         </Box>
       </div>
 
+      {/* Drawer Overlay Backdrop */}
       {mobileOpen ? (
         <button
           type="button"
-          className="fixed inset-0 z-40 bg-slate-950/40 md:hidden"
+          className="fixed inset-0 z-40 bg-slate-950/50 md:hidden backdrop-blur-xs"
           onClick={() => setMobileOpen(false)}
           aria-label="Close navigation overlay"
         />
