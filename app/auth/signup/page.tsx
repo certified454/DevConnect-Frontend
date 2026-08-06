@@ -137,8 +137,8 @@ const frameworkOptions = [
   'Elasticsearch',
 ];
 
-const MAX_LANGUAGES = 3;
-const MAX_FRAMEWORKS = 5;
+const MAX_LANGUAGES = 5;
+const MAX_FRAMEWORKS = 8;
 const ratingLabels: Record<number, string> = {
   1: 'Learning',
   2: 'Beginner',
@@ -148,9 +148,11 @@ const ratingLabels: Record<number, string> = {
 };
 
 export default function SignUpPage() {
-  const [name, setName] = useState('');
+  const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [selectedLanguages, setSelectedLanguages] = useState<string[]>([]);
   const [selectedFrameworks, setSelectedFrameworks] = useState<string[]>([]);
@@ -178,6 +180,38 @@ export default function SignUpPage() {
   const updateRating = (skill: string, value: number) => {
     setRatings((prev) => ({ ...prev, [skill]: value }));
   };
+
+  const handleUsernameChange = (value: string) => {
+    const cleaned = value.trim().replace(/^@+/, '');
+    setUsername(`@${cleaned}`);
+  };
+
+  const getPasswordStrength = (value: string) => {
+    let score = 0;
+    if (value.length >= 8) score += 1;
+    if (/[A-Z]/.test(value)) score += 1;
+    if (/[0-9]/.test(value)) score += 1;
+    if (/[^A-Za-z0-9]/.test(value)) score += 1;
+    return score;
+  };
+
+  const passwordStrength = getPasswordStrength(password);
+  const strengthColor =
+    passwordStrength <= 1
+      ? 'bg-red-500'
+      : passwordStrength === 2
+        ? 'bg-amber-500'
+        : passwordStrength === 3
+          ? 'bg-emerald-500'
+          : 'bg-emerald-600';
+  const strengthLabel =
+    passwordStrength <= 1
+      ? 'Weak'
+      : passwordStrength === 2
+        ? 'Fair'
+        : passwordStrength === 3
+          ? 'Good'
+          : 'Strong';
 
   const renderSkillSelector = (
     options: string[],
@@ -253,7 +287,7 @@ export default function SignUpPage() {
     ));
 
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.16),_transparent_33%),linear-gradient(135deg,_#f8fafc_0%,_#f0fdf4_100%)] px-4 py-8 text-slate-900 sm:px-6 lg:px-8">
+    <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(251,191,36,0.18),_transparent_35%),linear-gradient(135deg,_#f8fafc_0%,_#eefbf6_100%)] px-4 py-8 text-slate-900 sm:px-6 lg:px-8">
       <div className="mx-auto flex max-w-6xl flex-col overflow-hidden rounded-[32px] border border-white/70 bg-white/85 shadow-[0_25px_90px_rgba(15,23,42,0.12)] backdrop-blur-xl lg:flex-row">
         <section className="bg-slate-950 p-8 text-white lg:w-[44%] lg:p-10">
           <div className="inline-flex items-center gap-2 rounded-full border border-amber-400/30 bg-amber-500/10 px-3 py-1 text-sm font-medium text-amber-300">
@@ -290,22 +324,22 @@ export default function SignUpPage() {
                 Create your account
               </h2>
             </div>
-            <Link href="/" className="mt-6 text-sm font-medium mt-6 text-slate-500 transition hover:text-emerald-600">
+            <Link href="/" className="mt-6 inline-flex items-center justify-center rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700">
               Back home
             </Link>
           </div>
 
           <form className="space-y-4">
             <div className="rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3">
-              <label htmlFor="name" className="mb-2 block text-sm font-medium text-slate-700">
-                Full name
+              <label htmlFor="username" className="mb-2 block text-sm font-medium text-slate-700">
+                Username
               </label>
               <input
-                id="name"
+                id="username"
                 type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Sighter tech"
+                value={username}
+                onChange={(e) => handleUsernameChange(e.target.value)}
+                placeholder="sightertech"
                 className="w-full border-0 bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400"
               />
             </div>
@@ -320,6 +354,20 @@ export default function SignUpPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@example.com"
+                className="w-full border-0 bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400"
+              />
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3">
+              <label htmlFor="signup-phone" className="mb-2 block text-sm font-medium text-slate-700">
+                Phone number
+              </label>
+              <input
+                id="signup-phone"
+                type="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="+234 812 345 6789"
                 className="w-full border-0 bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400"
               />
             </div>
@@ -343,6 +391,28 @@ export default function SignUpPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Create a strong password"
+                className="w-full border-0 bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400"
+              />
+              {password ? (
+                <div className="mt-2 flex items-center gap-2">
+                  <div className="h-1.5 flex-1 rounded-full bg-slate-200">
+                    <div className={`h-1.5 rounded-full transition-all ${strengthColor}`} style={{ width: `${(passwordStrength / 4) * 100}%` }} />
+                  </div>
+                  <span className="text-[11px] font-semibold text-slate-500">{strengthLabel}</span>
+                </div>
+              ) : null}
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3">
+              <label htmlFor="confirm-password" className="mb-2 block text-sm font-medium text-slate-700">
+                Confirm password
+              </label>
+              <input
+                id="confirm-password"
+                type={showPassword ? 'text' : 'password'}
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="Re-enter your password"
                 className="w-full border-0 bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400"
               />
             </div>

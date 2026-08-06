@@ -155,7 +155,7 @@ function SiteFooter({ className = '' }: { className?: string }) {
             GL
           </span>
         </Box>
-        <Text className="text-sm text-slate-500">v1.0</Text>
+        <Text className="text-sl text-slate-500">v1.0</Text>
       </Box>
 
       {/* Link Columns */}

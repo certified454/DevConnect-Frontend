@@ -23,7 +23,7 @@ export default function SignInPage() {
             Sign in to discover developer circles, join thoughtful discussions, and stay close to the people shaping the next wave of tech in Nigeria.
           </p> */}
 
-          <div className="mt-8 space-y-3">
+          <div className="mt-6 space-y-3">
             {[
               'Fresh opportunities shared daily',
               'Real conversations with builders',
@@ -47,7 +47,7 @@ export default function SignInPage() {
                 Access your account
               </h2>
             </div>
-            <Link href="/" className="text-sm font-medium text-slate-500 transition mt-6 hover:text-emerald-600">
+            <Link href="/" className="mt-6 inline-flex items-center justify-center rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700">
               Back home
             </Link>
           </div>
