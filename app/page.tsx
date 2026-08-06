@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, type MouseEvent } from 'react';
+import { useRouter } from 'next/navigation';
 import NaijaStates from 'naija-state-local-government';
 import { Box } from '@/components/ui/box';
 import { Text } from '@/components/ui/text';
@@ -180,6 +181,8 @@ export default function Home() {
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [showScrollTop, setShowScrollTop] = useState(false);
 
+  const router = useRouter();
+
   const toggleTheme = () => setTheme((prev) => (prev === 'light' ? 'dark' : 'light'));
 
   useEffect(() => {
@@ -205,6 +208,10 @@ export default function Home() {
 
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
+
+  const handleSignIn = () => {
+    router.push('/auth/signin');
+  }
 
   const handleOpen = (postId: string) => setOpenPopover(postId);
   const handleClose = () => setOpenPopover(null);
@@ -324,8 +331,8 @@ export default function Home() {
                   </Text>
                 </div>
 
-                <Pressable className="mt-1 w-32 items-center rounded-full bg-amber-600 px-3 py-1.5 shadow-sm transition duration-200 hover:bg-amber-700 md:mt-0 md:w-40 md:px-4 md:py-2">
-                  <Text className="text-xs font-semibold text-white md:text-sm">Sign In</Text>
+                <Pressable onPress={handleSignIn} className="mt-1 w-32 items-center rounded-full bg-amber-600 px-3 py-1.5 shadow-sm transition duration-200 hover:bg-amber-700 md:mt-0 md:w-40 md:px-4 md:py-2">
+                  <Text className="text-xs font-semibold text-white md:text-sm">Sign Up</Text>
                 </Pressable>
               </div>
             </div>
