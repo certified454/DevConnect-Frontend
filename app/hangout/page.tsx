@@ -1,650 +1,664 @@
 'use client';
 
-import { useEffect, useState, type MouseEvent } from 'react';
-import { usePathname, useRouter } from 'next/navigation';
-import NaijaStates from 'naija-state-local-government';
+import { useEffect, useRef, useState } from 'react';
+import { Avatar, AvatarImage } from '@/components/ui/avatar';
 import { Box } from '@/components/ui/box';
-import { Text } from '@/components/ui/text';
-import {
-  ArrowUpIcon,
-  CalendarDaysIcon,
-  CloseIcon,
-  EyeIcon,
-  GlobeIcon,
-  Icon,
-  MenuIcon,
-  MessageCircleIcon,
-  SunIcon,
-  MoonIcon,
-  ThreeDotsIcon,
-  ChevronDownIcon,
-} from '@/components/ui/icon';
-import {
-  Avatar,
-  AvatarImage,
-} from '@/components/ui/avatar';
-import { Card } from '@/components/ui/card';
-import { VStack } from '@/components/ui/vstack';
-import {
-  Select,
-  SelectTrigger,
-  SelectInput,
-  SelectIcon,
-  SelectPortal,
-  SelectBackdrop,
-  SelectContent,
-  SelectDragIndicator,
-  SelectDragIndicatorWrapper,
-  SelectItem,
-} from '@/components/ui/select';
-import {
-  Popover,
-  PopoverBackdrop,
-  PopoverArrow,
-  PopoverBody,
-  PopoverContent,
-} from '@/components/ui/popover';
-import { Pressable } from 'react-native';
 import { Button, ButtonText } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Text } from '@/components/ui/text';
 
-function HouseIcon({ className = 'h-5 w-5' }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="currentColor" className={className}>
-      <path d="M12.53 3.3a1 1 0 0 0-1.06 0l-8 5.95A1 1 0 0 0 3 9.95V20a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1v-4h6v4a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1V9.95a1 1 0 0 0-.47-.9l-8-5.95Z" />
-    </svg>
-  );
-}
+const HANGOUT_ID = 'devconnect-hangout-1';
+const HANGOUT_STORAGE_KEY = 'devconnect-joined-hangouts';
+const MAX_CONCURRENT_SCREEN_SHARES = 2;
 
-function CalendarIcon({ className = 'h-5 w-5' }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="currentColor" className={className}>
-      <path d="M7 2a1 1 0 0 1 1 1v1h8V3a1 1 0 1 1 2 0v1h1a3 3 0 0 1 3 3v12a3 3 0 0 1-3 3H5a3 3 0 0 1-3-3V6a3 3 0 0 1 3-3h1V3a1 1 0 0 1 1-1Zm13 8H4v8a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-8Z" />
-    </svg>
-  );
-}
+type ChatMessage = {
+  id: string;
+  author: string;
+  text: string;
+  tone: 'system' | 'user' | 'admin';
+};
 
-function MessageIcon({ className = 'h-5 w-5' }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="currentColor" className={className}>
-      <path d="M5 4h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-5.5l-3.6 3.2a1 1 0 0 1-1.6-.8V18H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Zm2 4a1 1 0 1 0 0 2h8a1 1 0 1 0 0-2H7Zm0 4a1 1 0 1 0 0 2h5a1 1 0 1 0 0-2H7Z" />
-    </svg>
-  );
-}
+type Participant = {
+  id: string;
+  name: string;
+  skill: string;
+  role: 'host' | 'speaker' | 'viewer';
+  handRaised: boolean;
+  muted: boolean;
+  sharingScreen: boolean;
+};
 
-function SparkIcon({ className = 'h-5 w-5' }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="currentColor" className={className}>
-      <path d="m12 2 2 6 6 2-6 2-2 6-2-6-6-2 6-2 2-6Z" />
-    </svg>
-  );
-}
+type Spotlight = {
+  id: string;
+  name: string;
+  skill: string;
+  role: 'challenger' | 'speaker';
+};
 
-const nigerianStates = NaijaStates.states();
+type QueueFilter = 'all' | 'raised' | 'speaking';
+type RoomTab = 'chat' | 'people' | 'match';
 
-const feedPosts = [
-  {
-    id: 'p1',
-    name: 'Sighter tech ltd',
-    state: 'Lagos',
-    avatar:
-      'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxzZWFyY2h8Mnx8dXNlcnxlbnwwfHwwfHw%3D&auto=format&fit=crop&w=800&q=60',
-    comments: 6,
-    views: 312,
-    replyCount: 2,
-    replies: [
-      { id: 'r1', name: 'techmania', text: 'Great point!' },
-      { id: 'r2', name: 'sanuxtech', text: 'We should optimize for offline too.' },
-    ],
-  },
-  {
-    id: 'p2',
-    name: 'Marry technologies',
-    state: 'Rivers',
-    avatar: 'https://th.bing.com/th/id/OIP.xjq0g6I85ja3eBJRD0kdKAHaHa?w=202&h=202&c=7&r=0&o=7&dpr=1.3&pid=1.7&rm=3',
-    comments: 2,
-    views: 148,
-    replyCount: 0,
-    replies: [],
-  },
-  {
-    id: 'p3',
-    name: 'SoulTech',
-    state: 'Oyo',
-    avatar: 'https://th.bing.com/th/id/OIP.fNM5cKvrKHTcZ_0dilaaXgHaNN?w=187&h=333&c=7&r=0&o=7&dpr=1.3&pid=1.7&rm=3',
-    comments: 1,
-    views: 96,
-    replyCount: 1,
-    replies: [{ id: 'r3', name: 'devChidi', text: 'Nice work' }],
-  },
-  {
-    id: 'p4',
-    name: 'Favour Emmanuel',
-    state: 'FCT - Abuja',
-    avatar: 'https://th.bing.com/th/id/OIP.fNM5cKvrKHTcZ_0dilaaXgHaNN?w=187&h=333&c=7&r=0&o=7&dpr=1.3&pid=1.7&rm=3',
-    comments: 0,
-    views: 40,
-    replyCount: 0,
-    replies: [],
-  },
-  {
-    id: 'p5',
-    name: 'Sanux tech',
-    state: 'Lagos',
-    avatar:
-      'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxzZWFyY2h8Mnx8dXNlcnxlbnwwfHwwfHw%3D&auto=format&fit=crop&w=800&q=60',
-    comments: 6,
-    views: 312,
-    replyCount: 0,
-    replies: [],
-  },
+const initialMessages: ChatMessage[] = [
+  { id: 'm1', author: ' Devconnect team', text: 'Welcome to the live room. Mic access is controlled by the host.', tone: 'admin' },
+  { id: 'm2', author: 'Mina', text: 'I am ready to share my progress on the auth flow.', tone: 'user' },
 ];
 
-const tags = ["#today'stopic", '#Devwahala', '#dev', '#NgPower'];
+const initialParticipants: Participant[] = [
+  { id: 'host', name: 'Host Devconnect team', skill: 'Live host', role: 'host', handRaised: false, muted: false, sharingScreen: false },
+  { id: 'you', name: 'You', skill: 'Live collaboration', role: 'viewer', handRaised: false, muted: true, sharingScreen: false },
+  { id: 'mina', name: 'Mina', skill: 'Authentication flows', role: 'viewer', handRaised: true, muted: true, sharingScreen: false },
+  { id: 'tolu', name: 'Tolu', skill: 'Design systems', role: 'viewer', handRaised: true, muted: true, sharingScreen: false },
+  { id: 'bisi', name: 'Bisi', skill: 'Frontend performance', role: 'viewer', handRaised: false, muted: true, sharingScreen: false },
+];
 
-/**
- * Detailed SportyBet-style dark footer card component.
- */
-function SiteFooter({ className = '' }: { className?: string }) {
+const initialSpotlights: Spotlight[] = [
+  { id: 's1', name: 'Ada', skill: 'AI agent orchestration', role: 'challenger' },
+  { id: 's2', name: 'Timi', skill: 'Frontend performance', role: 'speaker' },
+];
+
+function getStoredJoinedHangouts() {
+  if (typeof window === 'undefined') return [];
+
+  try {
+    const stored = window.localStorage.getItem(HANGOUT_STORAGE_KEY);
+    return stored ? (JSON.parse(stored) as string[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function HamburgerIcon() {
   return (
-    <Box className={`bg-slate-900 border border-slate-800 p-4 rounded-2xl text-slate-300 ${className}`}>
-      {/* Brand Header */}
-      <Box className="flex-row items-center justify-between border-b border-slate-800 pb-3 mb-3">
-        <Box className="flex-row items-center gap-2">
-          <Text className="text-emerald-400 font-bold text-base">DevConnect</Text>
-          <span className="text-sl bg-emerald-950 text-emerald-400 border border-emerald-800 px-2 py-0.5 rounded-full font-medium">
-            GL
-          </span>
-        </Box>
-        <Text className="text-sl text-slate-500">v1.0</Text>
-      </Box>
-
-      {/* Link Columns */}
-      <Box className="grid grid-cols-3 gap-2 mb-4 text-left">
-
-        <Box className="flex flex-col gap-1.5">
-          <Text className="text-[11px] font-bold text-slate-100 uppercase tracking-wider">Company</Text>
-          <a href="#about" className="text-[11px] text-slate-400 hover:text-emerald-400 transition-colors">About Us</a>
-          <a href="#privacy" className="text-[11px] text-slate-400 hover:text-emerald-400 transition-colors">Privacy</a>
-          <a href="#terms" className="text-[11px] text-slate-400 hover:text-emerald-400 transition-colors">Terms</a>
-        </Box>
-
-        <Box className="flex flex-col gap-1.5">
-          <Text className="text-[11px] font-bold text-slate-100 uppercase tracking-wider">Community</Text>
-          <a href="#rules" className="text-[11px] text-slate-400 hover:text-emerald-400 transition-colors">Guidelines</a>
-          <a href="#topics" className="text-[11px] text-slate-400 hover:text-emerald-400 transition-colors">Topics</a>
-          <a href="#help" className="text-[11px] text-slate-400 hover:text-emerald-400 transition-colors">Support</a>
-          <a href="#faq" className="text-[11px] text-slate-400 hover:text-emerald-400 transition-colors">FAQs</a>
-        </Box>
-
-        <Box className="flex flex-col gap-1.5">
-          <Text className="text-[11px] font-bold text-slate-100 uppercase tracking-wider">Connect</Text>
-          <a href="#contact" className="text-[11px] text-slate-400 hover:text-emerald-400 transition-colors">Contact</a>
-          <a href="#socials" className="text-[11px] text-slate-400 hover:text-emerald-400 transition-colors">Socials</a>
-          <a href="#newsletter" className="text-[11px] text-slate-400 hover:text-emerald-400 transition-colors">Newsletter</a>
-        </Box>
-      </Box>
-
-      {/* Footer Tagline & Copyright */}
-      <Box className="border-t border-slate-800/80 pt-3 flex flex-col gap-1">
-        <Text className="text-[10px] text-slate-400 leading-tight">
-          Global premier tech hub for developers, creators, and innovators.
-        </Text>
-        <Text className="text-[9px] text-slate-500 mt-1">
-          © {new Date().getFullYear()} DevConnect Tech Ltd. All rights reserved.
-        </Text>
-      </Box>
-    </Box>
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    </svg>
   );
 }
 
-export default function Home() {
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const [selectedState, setSelectedState] = useState('all');
-  const [openPopover, setOpenPopover] = useState<string | null>(null);
-  const [activeReplies, setActiveReplies] = useState<string | null>(null);
-  const [theme, setTheme] = useState<'light' | 'dark'>('light');
-  const [showScrollTop, setShowScrollTop] = useState(false);
+function CloseIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+}
 
-  const router = useRouter();
-  const pathname = usePathname();
+export default function HangoutPage() {
+  const [joined, setJoined] = useState(false);
+  const [isLive, setIsLive] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(true);
+  const [micEnabled, setMicEnabled] = useState(false);
+  const [adminMuted, setAdminMuted] = useState(false);
+  const [handRaised, setHandRaised] = useState(false);
+  const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
+  const [draft, setDraft] = useState('');
+  const [participants, setParticipants] = useState<Participant[]>(initialParticipants);
+  const [spotlights, setSpotlights] = useState<Spotlight[]>(initialSpotlights);
+  const [screenStream, setScreenStream] = useState<MediaStream | null>(null);
+  const [shareError, setShareError] = useState<string | null>(null);
+  const [isFullScreen, setIsFullScreen] = useState(false);
 
-  const toggleTheme = () => setTheme((prev) => (prev === 'light' ? 'dark' : 'light'));
+  // Everything that isn't the video stage — chat, the roster, the challenge
+  // card — lives behind one slide-out drawer so the stage can own the whole
+  // window. This mirrors the app's own nav drawer pattern.
+  const [roomPanelOpen, setRoomPanelOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<RoomTab>('chat');
+  const [queueFilter, setQueueFilter] = useState<QueueFilter>('all');
+  const [lastReadCount, setLastReadCount] = useState(initialMessages.length);
+
+  const screenVideoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
-    const savedTheme = window.localStorage.getItem('theme');
-    if (savedTheme === 'dark' || savedTheme === 'light') {
-      setTheme(savedTheme);
+    const joinedHangouts = getStoredJoinedHangouts();
+    setJoined(joinedHangouts.includes(HANGOUT_ID));
+  }, []);
+
+  useEffect(() => {
+    if (screenVideoRef.current && screenStream) {
+      screenVideoRef.current.srcObject = screenStream;
     }
-  }, []);
+  }, [screenStream]);
 
   useEffect(() => {
-    const root = document.documentElement;
-    root.classList.toggle('dark', theme === 'dark');
-    window.localStorage.setItem('theme', theme);
-  }, [theme]);
-
-  useEffect(() => {
-    const handleScroll = () => {
-      setShowScrollTop(window.scrollY > 300);
+    return () => {
+      screenStream?.getTracks().forEach((track) => track.stop());
     };
+  }, [screenStream]);
 
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    handleScroll();
+  // Keep the unread-chat badge accurate: whenever the drawer is open on the
+  // Chat tab, treat every message as read.
+  useEffect(() => {
+    if (roomPanelOpen && activeTab === 'chat') {
+      setLastReadCount(messages.length);
+    }
+  }, [roomPanelOpen, activeTab, messages.length]);
 
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
+  const handleJoinHangout = () => {
+    const existing = getStoredJoinedHangouts();
+    const updated = existing.includes(HANGOUT_ID) ? existing : [...existing, HANGOUT_ID];
 
-  const handleSignIn = () => {
-    router.push('/auth/signin');
-  }
+    setJoined(true);
 
-  const handleCreateTopic = () => {
-    router.push('/topic');
-  }
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(HANGOUT_STORAGE_KEY, JSON.stringify(updated));
+    }
+  };
 
-  const currentSection = pathname === '/hangout' ? 'hangout' : pathname === '/' ? 'home' : 'home';
+  const handleSendMessage = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
 
-  const navItems = [
-    { label: 'Home', href: '/', icon: <HouseIcon className="h-5 w-5" />, active: currentSection === 'home' },
-    { label: 'Hangout', href: '/hangout', icon: <CalendarIcon className="h-5 w-5" />, active: currentSection === 'hangout' },
-    { label: 'Discussion', href: '#discussion', icon: <MessageIcon className="h-5 w-5" />, active: false },
-    { label: 'Hub', href: '#hub', icon: <SparkIcon className="h-5 w-5" />, active: false },
-  ];
+    if (!draft.trim()) return;
 
-  const handleOpen = (postId: string) => setOpenPopover(postId);
-  const handleClose = () => setOpenPopover(null);
-  const closeReplies = () => setActiveReplies(null);
+    setMessages((current) => [
+      ...current,
+      {
+        id: `m-${Date.now()}`,
+        author: 'You',
+        text: draft.trim(),
+        tone: 'user',
+      },
+    ]);
+    setDraft('');
+  };
 
-  const visiblePosts =
-    selectedState === 'all'
-      ? feedPosts
-      : feedPosts.filter((post) => post.state === selectedState);
+  const toggleMic = () => {
+    if (!joined) return;
+    setMicEnabled((current) => !current);
+  };
+
+  const raiseHandNow = () => {
+    if (handRaised) return;
+
+    setHandRaised(true);
+    setParticipants((current) => current.map((participant) => participant.id === 'you' ? { ...participant, handRaised: true } : participant));
+  };
+
+  const admitSpeaker = (participantId: string) => {
+    setParticipants((current) =>
+      current.map((participant) => {
+        if (participant.id !== participantId) return participant;
+
+        return { ...participant, role: 'speaker', handRaised: false, muted: false };
+      }),
+    );
+  };
+
+  const muteParticipant = (participantId: string) => {
+    setParticipants((current) =>
+      current.map((participant) => {
+        if (participant.id !== participantId) return participant;
+
+        return { ...participant, muted: !participant.muted };
+      }),
+    );
+  };
+
+  // Up to MAX_CONCURRENT_SCREEN_SHARES participants can share a screen at
+  // once (the two live challengers). Toggling a new sharer past the cap
+  // bumps the earliest sharer off so the stage never overflows.
+  const shareScreen = (participantId: string) => {
+    const participant = participants.find((entry) => entry.id === participantId);
+    if (!participant) return;
+
+    setParticipants((current) => {
+      const isCurrentlySharing = current.find((entry) => entry.id === participantId)?.sharingScreen;
+
+      if (isCurrentlySharing) {
+        return current.map((entry) => (entry.id === participantId ? { ...entry, sharingScreen: false } : entry));
+      }
+
+      const otherSharers = current.filter((entry) => entry.sharingScreen && entry.id !== participantId);
+      let next = current;
+
+      if (otherSharers.length >= MAX_CONCURRENT_SCREEN_SHARES) {
+        const [oldestSharer] = otherSharers;
+        next = next.map((entry) => (entry.id === oldestSharer.id ? { ...entry, sharingScreen: false } : entry));
+      }
+
+      return next.map((entry) =>
+        entry.id === participantId ? { ...entry, sharingScreen: true, role: 'speaker' } : entry,
+      );
+    });
+
+    setSpotlights((current) => [
+      ...current.filter((entry) => entry.id !== participant.id),
+      {
+        id: participant.id,
+        name: participant.name,
+        skill: participant.skill,
+        role: 'speaker',
+      },
+    ]);
+  };
+
+  const toggleHostScreenShare = async () => {
+    if (typeof window === 'undefined' || !navigator.mediaDevices?.getDisplayMedia) {
+      setShareError('Screen sharing is not supported in this browser.');
+      return;
+    }
+
+    if (screenStream) {
+      screenStream.getTracks().forEach((track) => track.stop());
+      setScreenStream(null);
+      setShareError(null);
+      setParticipants((current) => current.map((entry) => (entry.id === 'host' ? { ...entry, sharingScreen: false } : entry)));
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getDisplayMedia({
+        video: true,
+        audio: true,
+      });
+
+      setScreenStream(stream);
+      setShareError(null);
+      setIsAdmin(true);
+      setParticipants((current) => current.map((entry) => (entry.id === 'host' ? { ...entry, sharingScreen: true } : entry)));
+      setMessages((current) => [
+        ...current,
+        {
+          id: `m-${Date.now()}`,
+          author: 'Devconnect team',
+          text: 'You are now sharing your screen with the room.',
+          tone: 'admin',
+        },
+      ]);
+    } catch {
+      setShareError('Screen share permission was denied or cancelled.');
+    }
+  };
+
+  const toggleFullScreen = async () => {
+    if (typeof window === 'undefined') return;
+
+    const target = document.documentElement;
+
+    if (!document.fullscreenElement) {
+      await target.requestFullscreen();
+      setIsFullScreen(true);
+      return;
+    }
+
+    await document.exitFullscreen();
+    setIsFullScreen(false);
+  };
+
+  const openPanel = (tab: RoomTab) => {
+    setActiveTab(tab);
+    setRoomPanelOpen(true);
+  };
+
+  const canSpeak = joined && micEnabled && !adminMuted;
+  const hostParticipant = participants.find((entry) => entry.id === 'host') ?? participants[0];
+  const screenSharers = participants.filter((entry) => entry.sharingScreen).slice(0, MAX_CONCURRENT_SCREEN_SHARES);
+
+  const handRaisedCount = participants.filter((entry) => entry.handRaised).length;
+  const speakingCount = participants.filter((entry) => entry.role !== 'viewer').length;
+  const unreadMessages = Math.max(0, messages.length - lastReadCount);
+  const visibleParticipants = participants.filter((entry) => {
+    if (queueFilter === 'raised') return entry.handRaised;
+    if (queueFilter === 'speaking') return entry.role !== 'viewer';
+    return true;
+  });
 
   return (
-    <Box className="min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
-      <Box className="flex min-h-screen flex-col md:h-screen md:flex-row md:overflow-hidden">
-        {/* Desktop Left Sidebar Spacer */}
-        <Box className="hidden md:block md:w-64 md:shrink-0" />
+    <Box className="min-h-screen bg-slate-950 text-slate-100">
+      <Box className="mx-auto flex max-w-[1700px] flex-col gap-4 p-3 md:p-5">
+        {!isLive ? (
+          <Box className="flex flex-col gap-4 rounded-3xl border border-slate-800 bg-slate-900/80 p-5 shadow-2xl shadow-slate-950/50 md:flex-row md:items-center md:justify-between">
+            <Box>
+              <Text className="text-sm uppercase tracking-[0.3em] text-emerald-400">Live hangout</Text>
+              <Text className="mt-1 text-lg font-semibold text-white md:text-3xl">Developer showdown room</Text>
+              <Text className="mt-2 max-w-2xl text-sm text-slate-400">
+                Live hangout to watch developers compete in real time, share ideas, and discuss solutions.
+              </Text>
+            </Box>
 
-        {/* Main Content Area */}
-        <Box className="flex-1 px-3 pb-8 md:ml-2 md:h-screen md:overflow-hidden md:p-6">
-          {/* Top Zone: Fixed Header on desktop, Sticky Header on mobile */}
-          <div className="sticky top-0 z-40 bg-slate-50/95 dark:bg-slate-950/95 backdrop-blur-md border-b border-slate-200/70 dark:border-slate-800 md:relative md:border-b-0 md:bg-transparent">
-            {/* Mobile Top Navigation Bar */}
-            <div className="flex items-center justify-between border-b border-slate-200/70 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 px-4 py-3 md:hidden">
-              <button
-                type="button"
-                onClick={() => setMobileOpen(true)}
-                aria-label="Open navigation"
-                className="rounded-md p-2 text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800"
+            <Box className="flex flex-col gap-2 md:items-end">
+              <Button
+                onPress={handleJoinHangout}
+                className={joined ? 'rounded-full bg-slate-700 px-4 py-2' : 'rounded-full bg-emerald-600 px-4 py-2'}
               >
-                <MenuIcon className="h-5 w-5" />
-              </button>
-              <Box className="flex-row ml-auto items-center">
-                <Text className="text-prima text-lg font-semibold dark:text-slate-100">DevConnect</Text>
-                <img src="/icon/logo.png" className="h-10 w-10 rounded-[0.8em] ml-2" />
-              </Box>
-              <div className="w-9" />
-            </div>
-
-            {/* State Filter Bar */}
-            <Box className="px-4 py-3 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md md:rounded-2xl md:bg-white md:dark:bg-slate-900 md:border md:border-slate-200/70 dark:border-slate-800 md:px-6 md:py-3.5 md:mb-3">
-              <Box className="flex-row items-center gap-3">
-                <Box className="flex-row items-center gap-2">
-                  <Icon as={GlobeIcon} className="h-4 w-4 text-emerald-600" />
-                  <Text className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">
-                    Filter by state:
-                  </Text>
-                </Box>
-
-                <Select
-                  selectedValue={selectedState}
-                  onValueChange={(value: any) => setSelectedState(value)}
+                <ButtonText className="text-sm font-semibold text-white">
+                  {joined ? 'Joined to this hangout' : 'Join hangout'}
+                </ButtonText>
+              </Button>
+              <Box className="flex gap-2">
+                <Button
+                  onPress={() => setIsLive((current) => !current)}
+                  className="rounded-full border border-slate-700 bg-slate-900 px-4 py-2"
                 >
-                  <SelectTrigger
-                    variant="outline"
-                    size="sm"
-                    className="w-44 rounded-full border-slate-200 bg-white text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 px-4 py-1.5 data-[focus=true]:border-emerald-400 data-[focus=true]:ring-2 data-[focus=true]:ring-emerald-100"
-                  >
-                    <SelectInput
-                      placeholder="All States"
-                      value={selectedState === 'all' ? 'All States' : selectedState}
-                      className="text-sm font-medium text-slate-700 dark:text-slate-200"
-                    />
-                    <SelectIcon className="mr-3" as={ChevronDownIcon} />
-                  </SelectTrigger>
-                  <SelectPortal>
-                    <SelectBackdrop />
-                    <SelectContent className="max-h-[70vh] scrollbar-hide rounded-t-2xl border-t border-slate-100 bg-white px-2 pb-6 md:max-h-96 md:rounded-2xl md:border md:p-2 md:shadow-xl md:shadow-slate-950/10 dark:bg-slate-900 dark:border-slate-800 dark:text-slate-200">
-                      <SelectDragIndicatorWrapper className="py-3">
-                        <SelectDragIndicator className="bg-slate-200 dark:bg-slate-700" />
-                      </SelectDragIndicatorWrapper>
-
-                      <SelectItem
-                        label="All States"
-                        value="all"
-                        className="mx-1 mb-1 rounded-lg border-b border-slate-100 px-3 py-2.5 text-sm font-medium text-slate-700 dark:text-slate-200 data-[highlighted=true]:bg-emerald-50 data-[highlighted=true]:text-emerald-700"
-                      />
-
-                      {nigerianStates.map((state) => (
-                        <SelectItem
-                          key={state}
-                          label={state}
-                          value={state}
-                          className="mx-1 rounded-lg px-3 py-2.5 text-sm text-slate-600 dark:text-slate-300 data-[highlighted=true]:bg-emerald-50 data-[highlighted=true]:text-emerald-700"
-                        />
-                      ))}
-                    </SelectContent>
-                  </SelectPortal>
-                </Select>
-                <button
-                  type="button"
-                  onClick={toggleTheme}
-                  aria-label="Toggle dark mode"
-                  className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+                  <ButtonText className="text-sm font-semibold text-slate-200">
+                    {isLive ? 'Live room' : 'Upcoming room'}
+                  </ButtonText>
+                </Button>
+                <Button
+                  onPress={() => setIsAdmin((current) => !current)}
+                  className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-4 py-2"
                 >
-                  <Icon as={theme === 'dark' ? SunIcon : MoonIcon} className="h-4 w-4" />
-                </button>
+                  <ButtonText className="text-sm font-semibold text-emerald-300">
+                    {isAdmin ? 'Admin view' : 'Viewer view'}
+                  </ButtonText>
+                </Button>
               </Box>
             </Box>
-          </div>
+          </Box>
+        ) : null}
 
-          {/* Welcome Card Banner */}
-          <div className="welcome-card relative mt-3 mb-3 overflow-hidden rounded-2xl border border-amber-100 p-3 shadow-sm shadow-amber-100/70 md:mb-4 md:rounded-3xl md:p-6 bg-gradient-to-r from-amber-50/50 to-emerald-50/50 dark:from-slate-800/80 dark:to-slate-900/90">
-            <div className="relative flex flex-col gap-2 md:flex-row md:items-center md:justify-between md:gap-3">
-              <div className="flex flex-col gap-1">
-                <Text className="text-[15px] tracking-[0.20em] md:text-xl md:tracking-[0.24em] font-bold uppercase text-amber-600">
-                  Welcome to DevConnect
+        {!joined ? (
+          <Card className="rounded-3xl border border-slate-800 bg-slate-900/70 p-6">
+            <Text className="text-xl font-semibold text-white">Join first to unlock the room</Text>
+            <Button onPress={handleJoinHangout} className="mt-4 rounded-full bg-emerald-600 px-4 py-2">
+              <ButtonText className="text-sm font-semibold text-white">Join now</ButtonText>
+            </Button>
+          </Card>
+        ) : !isLive ? (
+          <Card className="rounded-3xl border border-slate-800 bg-slate-900/70 p-6">
+            <Text className="mt-2 text-sm text-slate-400">
+              The room is not live yet. Full access to live will be available once streaming starts
+            </Text>
+            <Box className="mt-4 rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
+              <Text className="text-sm font-semibold text-emerald-300">Topic</Text>
+              <Text className="mt-1 text-lg font-semibold text-white">Building a better developer community in Nigeria</Text>
+              <Text className="mt-2 text-sm text-slate-400">Starting soon </Text>
+            </Box>
+          </Card>
+        ) : (
+          <Box className="flex flex-col gap-3">
+            {/* Slim top bar — everything else moved into the drawer below */}
+            <Box className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-800 bg-slate-900/70 px-4 py-3">
+              <Box className="flex items-center gap-3">
+                <Box className="rounded-full bg-rose-500/20 px-3 py-1">
+                  <Text className="text-xs font-semibold uppercase tracking-[0.25em] text-rose-300">Live</Text>
+                </Box>
+                <Text className="text-sm text-slate-400">
+                  {screenSharers.length > 0 ? `${screenSharers.length} sharing screen` : 'No one sharing a screen yet'}
                 </Text>
-                <Text className="text-[13px] text-slate-900 dark:text-slate-100 md:text-sm">
-                  Here developers connect, share knowledge, fix problems, collaborate on projects, explore discussions, join communities, and stay updated with the latest in the tech world.
-                </Text>
-              </div>
+              </Box>
 
-              <div className="flex w-auto flex-col items-center justify-center gap-2 md:gap-3">
-                <div className="welcome-badge flex items-center gap-1.5 rounded-full bg-white/80 dark:bg-slate-800/80 px-2.5 py-1.5 shadow-sm md:gap-2 md:px-3 md:py-2">
-                  <span className="welcome-dot h-2 w-2 rounded-full bg-amber-500 md:h-2.5 md:w-2.5" />
-                  <Text className="text-sm font-medium text-slate-700 dark:text-slate-200 md:text-xs">
-                    It only takes a minute to sign in and start connecting with other developers!
-                  </Text>
-                </div>
+              <Box className="flex flex-wrap gap-2">
+                <Button onPress={() => setAdminMuted((current) => !current)} className="rounded-full border border-slate-700 bg-slate-950 px-3 py-2">
+                  <ButtonText className="text-sm font-semibold text-slate-200">
+                    {adminMuted ? 'Unmute room' : 'Mute room'}
+                  </ButtonText>
+                </Button>
+                <Button onPress={() => setIsAdmin((current) => !current)} className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-2">
+                  <ButtonText className="text-sm font-semibold text-emerald-300">
+                    {isAdmin ? 'Admin controls' : 'Viewer controls'}
+                  </ButtonText>
+                </Button>
+              </Box>
+            </Box>
 
-                <Pressable onPress={handleSignIn} className="mt-1 w-32 items-center rounded-full bg-amber-600 px-3 py-1.5 shadow-sm transition duration-200 hover:bg-amber-700 md:mt-0 md:w-40 md:px-4 md:py-2">
-                  <Text className="text-xs font-semibold text-white md:text-sm">Sign Up</Text>
-                </Pressable>
-              </div>
-            </div>
-          </div>
-
-          {/* Grid/Flex Layout for Feed & Sidebar */}
-          <Box className="flex flex-col gap-4 md:min-h-0 md:flex-1 md:flex-row md:gap-6">
-            {/* Infinite Feed Column */}
-            <VStack className="order-2 w-full gap-4 md:order-1 md:h-full md:w-[63%] md:min-h-0 md:overflow-y-auto md:pr-2 md:pb-6 scrollbar-hide">
-              {visiblePosts.map((post) => (
-                <Card
-                  key={post.id}
-                  className="w-full shadow shadow-slate-200 rounded-2xl bg-white border border-slate-100 p-5 dark:shadow-slate-950/40 dark:bg-slate-900 dark:border-slate-800"
-                >
-                  <Box className="flex-row items-center justify-between">
-                    <Box className="flex-row items-center gap-3">
-                      <Avatar>
-                        <AvatarImage source={{ uri: post.avatar }} />
-                      </Avatar>
-                      <Box>
-                        <Text className="font-semibold">{post.name}</Text>
-                        <Text className="text-sm text-gray-500 dark:text-slate-400">3 hr ago · {post.state}</Text>
-                      </Box>
-                    </Box>
-                    <Popover
-                      isOpen={openPopover === post.id}
-                      onClose={handleClose}
-                      onOpen={() => handleOpen(post.id)}
-                      placement="bottom"
-                      trigger={(triggerProps) => {
-                        return (
-                          <Button className='bg-slate-100 dark:bg-slate-800 rounded-full p-2' {...triggerProps}>
-                            <ButtonText>
-                              <Icon as={ThreeDotsIcon} className="h-5 w-5 text-black dark:text-slate-100" />
-                            </ButtonText>
-                          </Button>
-                        );
-                      }}
-                    >
-                      <PopoverBackdrop />
-                      <PopoverContent>
-                        <PopoverArrow />
-                        <PopoverBody>
-                          <Text className="text-foreground">
-                            Skip this post
-                          </Text>
-                        </PopoverBody>
-                      </PopoverContent>
-                    </Popover>
+            {/*
+              The stage: the entire remaining window height, split evenly
+              across the 3 live feeds (admin camera + 2 challenger screens).
+              This is the whole point of the room, so it gets almost all
+              the space.
+            */}
+            <Box className="grid gap-3 lg:h-[calc(100vh-190px)] lg:grid-cols-3">
+              {/* Admin / host live camera */}
+              <Box className="flex min-h-[360px] flex-col justify-between gap-4 rounded-[1.5rem] border border-slate-800 bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.24),_transparent_60%),linear-gradient(135deg,_rgba(30,41,59,0.98),_rgba(2,6,23,0.98))] p-5 lg:h-full">
+                <Box className="flex items-start justify-between">
+                  <Box>
+                    <Text className="text-lg font-semibold text-white">{hostParticipant?.name}</Text>
+                    <Text className="text-sm text-slate-300">{hostParticipant?.skill}</Text>
                   </Box>
+                  <Box className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1">
+                    <Text className="text-sm font-medium text-emerald-300">
+                      {hostParticipant?.muted ? 'Mic muted' : canSpeak ? 'Mic live' : 'Mic muted'}
+                    </Text>
+                  </Box>
+                </Box>
 
-                  <Text className="text-xl md:text-2xl font-bold text-slate-900 dark:text-slate-100 mt-3 mb-2">
-                    Internet Service Providers and Local Devs
-                  </Text>
-                  <Text className="text-xs text-slate-600 dark:text-slate-400 md:text-sm leading-relaxed">
-                    Nigerian developers are out here building world-class fintechs, SaaS platforms, and mobile
-                    apps—while waging a daily war against latency, packet loss, and data costs. From switching
-                    between 4G/5G mobile networks, fiber providers, and Starlink to optimizing apps for slow
-                    connections, local devs are masters of resilience. Good ISP infrastructure isn&apos;t just
-                    about fast downloads; it&apos;s the engine powering Nigeria&apos;s tech economy. Respect to
-                    every dev shipping clean code through tough network conditions! 🚀
-                  </Text>
+                <Box className="flex flex-1 items-center justify-center rounded-[1.1rem] border border-dashed border-slate-700 bg-slate-950/70 p-4 text-center">
+                  <Text className="text-sm text-slate-300">{hostParticipant?.name} is live on camera and ready to speak.</Text>
+                </Box>
 
-                  <Box className="mt-4 flex-row flex-wrap gap-2">
-                    {tags.map((tag) => (
-                      <Card
-                        key={tag}
-                        className="bg-emerald-50 text-emerald-700 items-center justify-center rounded-full px-3 py-1 border border-emerald-100 shadow-none dark:bg-emerald-900/20 dark:text-emerald-300 dark:border-emerald-800"
-                      >
-                        <Text className="text-emerald-700 text-xs font-medium">{tag}</Text>
-                      </Card>
+                <Box className="flex flex-wrap gap-2">
+                  <Button onPress={toggleMic} className={canSpeak ? 'rounded-full bg-slate-700 px-3 py-2' : 'rounded-full bg-emerald-600 px-3 py-2'}>
+                    <ButtonText className="text-sm font-semibold text-white">
+                      {micEnabled ? 'Turn mic off' : 'Turn mic on'}
+                    </ButtonText>
+                  </Button>
+                  <Button onPress={toggleHostScreenShare} className={screenStream ? 'rounded-full border border-emerald-500/40 bg-emerald-500/15 px-3 py-2' : 'rounded-full border border-slate-700 bg-slate-900 px-3 py-2'}>
+                    <ButtonText className="text-sm font-semibold text-white">
+                      {screenStream ? 'Stop sharing' : 'Share my screen'}
+                    </ButtonText>
+                  </Button>
+                  <Button onPress={toggleFullScreen} className="rounded-full border border-slate-700 bg-slate-900 px-3 py-2">
+                    <ButtonText className="text-sm font-semibold text-white">{isFullScreen ? 'Exit full screen' : 'Full screen'}</ButtonText>
+                  </Button>
+                </Box>
+              </Box>
+
+              {/* Screen share tile 1 */}
+              <Box className="flex min-h-[360px] flex-col rounded-[1.5rem] border border-slate-700 bg-slate-900/70 p-4 lg:h-full">
+                <Text className="text-xs uppercase tracking-[0.25em] text-slate-400">
+                  {screenSharers[0] ? `${screenSharers[0].name}'s screen` : 'Screen share slot 1'}
+                </Text>
+                {screenSharers[0]?.id === 'host' && screenStream ? (
+                  <video
+                    ref={screenVideoRef}
+                    autoPlay
+                    playsInline
+                    muted
+                    className="mt-3 min-h-0 w-full flex-1 rounded-[1.1rem] object-cover"
+                  />
+                ) : screenSharers[0] ? (
+                  <Box className="mt-3 flex min-h-0 flex-1 items-center justify-center rounded-[1.1rem] border border-dashed border-slate-700 bg-slate-950/70 p-4 text-center">
+                    <Text className="text-sm text-slate-300">
+                      {screenSharers[0].name} is sharing a coding screen, challenge board, and terminal output.
+                    </Text>
+                  </Box>
+                ) : (
+                  <Box className="mt-3 flex min-h-0 flex-1 items-center justify-center rounded-[1.1rem] border border-dashed border-slate-700 bg-slate-950/70 p-4 text-center">
+                    <Text className="text-sm text-slate-400">Waiting for a challenger to share their screen.</Text>
+                  </Box>
+                )}
+              </Box>
+
+              {/* Screen share tile 2 */}
+              <Box className="flex min-h-[360px] flex-col rounded-[1.5rem] border border-slate-700 bg-slate-900/70 p-4 lg:h-full">
+                <Text className="text-xs uppercase tracking-[0.25em] text-slate-400">
+                  {screenSharers[1] ? `${screenSharers[1].name}'s screen` : 'Screen share slot 2'}
+                </Text>
+                {screenSharers[1] ? (
+                  <Box className="mt-3 flex min-h-0 flex-1 items-center justify-center rounded-[1.1rem] border border-dashed border-slate-700 bg-slate-950/70 p-4 text-center">
+                    <Text className="text-sm text-slate-300">
+                      {screenSharers[1].name} is sharing a coding screen, challenge board, and terminal output.
+                    </Text>
+                  </Box>
+                ) : (
+                  <Box className="mt-3 flex min-h-0 flex-1 items-center justify-center rounded-[1.1rem] border border-dashed border-slate-700 bg-slate-950/70 p-4 text-center">
+                    <Text className="text-sm text-slate-400">Waiting for a second challenger to share their screen.</Text>
+                  </Box>
+                )}
+              </Box>
+            </Box>
+
+            {shareError ? <Text className="text-sm text-amber-300">{shareError}</Text> : null}
+          </Box>
+        )}
+      </Box>
+
+      {/* Floating launcher for chat / people / challenge match — stays out
+          of the way of the stage until someone wants it. */}
+      {joined && isLive ? (
+        <Box className="fixed bottom-6 right-6 z-40 flex flex-col items-end gap-2">
+          <Button
+            onPress={() => openPanel('chat')}
+            className="relative rounded-full bg-emerald-600 px-5 py-3 shadow-2xl shadow-emerald-950/60"
+          >
+            <Box className="flex items-center gap-2 text-white">
+              <HamburgerIcon />
+              <ButtonText className="text-sm font-semibold text-white">Room</ButtonText>
+            </Box>
+            {unreadMessages > 0 ? (
+              <Box className="absolute -right-1.5 -top-1.5 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-rose-500 px-1">
+                <Text className="text-[11px] font-bold text-white">{unreadMessages > 9 ? '9+' : unreadMessages}</Text>
+              </Box>
+            ) : null}
+          </Button>
+        </Box>
+      ) : null}
+
+      {/* Slide-out drawer with the rest of the room: chat, roster, challenge */}
+      {roomPanelOpen ? (
+        <Box className="fixed inset-0 z-50 flex justify-end">
+          <Box onClick={() => setRoomPanelOpen(false)} className="absolute inset-0 bg-black/60" />
+
+          <Box className="relative z-10 flex h-full w-full max-w-md flex-col border-l border-slate-800 bg-slate-950 shadow-2xl">
+            <Box className="flex items-center justify-between border-b border-slate-800 p-4">
+              <Text className="text-lg font-semibold text-white">Room</Text>
+              <Button onPress={() => setRoomPanelOpen(false)} className="rounded-full border border-slate-700 bg-slate-900 p-2">
+                <Box className="text-slate-200">
+                  <CloseIcon />
+                </Box>
+              </Button>
+            </Box>
+
+            <Box className="flex gap-2 border-b border-slate-800 p-3">
+              {(
+                [
+                  { key: 'chat', label: 'Chat' },
+                  { key: 'people', label: `People (${participants.length})` },
+                  { key: 'match', label: 'Challenge' },
+                ] as { key: RoomTab; label: string }[]
+              ).map((tab) => (
+                <Button
+                  key={tab.key}
+                  onPress={() => setActiveTab(tab.key)}
+                  className={
+                    activeTab === tab.key
+                      ? 'rounded-full bg-emerald-600 px-3 py-1.5'
+                      : 'rounded-full border border-slate-700 bg-slate-900 px-3 py-1.5'
+                  }
+                >
+                  <ButtonText className="text-xs font-semibold text-white">{tab.label}</ButtonText>
+                </Button>
+              ))}
+            </Box>
+
+            <Box className="flex-1 overflow-y-auto p-4">
+              {activeTab === 'chat' ? (
+                <Box className="flex h-full flex-col gap-3">
+                  <Box className="flex flex-1 flex-col gap-2 overflow-y-auto rounded-2xl border border-slate-800 bg-slate-900/70 p-3">
+                    {messages.map((message) => (
+                      <Box key={message.id} className="rounded-xl border border-slate-800 bg-slate-950/70 px-3 py-2">
+                        <Text className="text-xs uppercase tracking-[0.24em] text-emerald-400">{message.author}</Text>
+                        <Text className="mt-1 text-sm text-slate-200">{message.text}</Text>
+                      </Box>
                     ))}
                   </Box>
 
-                  <Box className="mt-3 flex-row items-center justify-end gap-5 border-t border-slate-100 dark:border-slate-800 pt-3">
-                    <Box className="flex-row items-center gap-1">
-                      <Icon as={MessageCircleIcon} className="h-4 w-4 text-slate-400" />
-                      <button
-                        type="button"
-                        onClick={() => setActiveReplies(post.id)}
-                        className="text-xs text-slate-600 dark:text-slate-300 hover:underline ml-1"
-                      >
-                        {post.replyCount} repl{post.replyCount === 1 ? 'y' : 'ies'}
-                      </button>
-                    </Box>
-
-                    <Box className="flex-row items-center gap-1.5">
-                      <Icon as={EyeIcon} className="h-4 w-4 text-slate-400" />
-                      <Text className="text-xs font-medium text-slate-500">{post.views}</Text>
-                    </Box>
-                  </Box>
-                </Card>
-              ))}
-
-              {visiblePosts.length === 0 && (
-                <Card className="w-full rounded-2xl bg-white p-6 border border-slate-100 shadow-sm">
-                  <Text className="text-slate-500 dark:text-slate-400">No posts found for {selectedState}.</Text>
-                </Card>
-              )}
-            </VStack>
-
-            {/* Right Sidebar (Upcoming Hangout & Desktop Footer) */}
-            <Box className="order-1 w-full flex flex-col gap-4 md:order-2 md:h-full md:w-[35%] md:overflow-y-auto scrollbar-hide">
-              {/* Hangout Card */}
-              <Card className="w-full shadow shadow-slate-200 rounded-2xl bg-white border border-slate-100 p-4 shadow-sm dark:shadow-slate-950/40 dark:bg-slate-900 dark:border-slate-800">
-                <Box className="flex-row items-center justify-between md:block">
-                  <Text className="text-sm font-semibold text-slate-900 dark:text-slate-100 md:text-center md:text-base">
-                    Upcoming Live Hangout
-                  </Text>
-                  <Text className="text-xs font-bold text-emerald-700 md:hidden">
-                    05:56:43
-                  </Text>
-                </Box>
-
-                <Box className="flex-row items-center gap-3 mt-3 md:justify-center">
-                  <Avatar className="h-10 w-10 md:h-12 md:w-12">
-                    <AvatarImage
-                      source={{
-                        uri: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxzZWFyY2h8Mnx8dXNlcnxlbnwwfHwwfHw%3D&auto=format&fit=crop&w=800&q=60',
-                      }}
+                  <form onSubmit={handleSendMessage} className="flex flex-col gap-2">
+                    <input
+                      value={draft}
+                      onChange={(event) => setDraft(event.target.value)}
+                      placeholder="Write in the live stream"
+                      className="rounded-2xl border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 outline-none"
                     />
-                  </Avatar>
-                  <Box className="min-w-0 flex-1 gap-0.5 md:flex-none md:text-center">
-                    <Text className="text-[10px] text-slate-400 dark:text-slate-300 md:text-xs">
-                      Topic
-                    </Text>
-                    <Text className="truncate text-xs font-semibold text-slate-900 dark:text-slate-100 md:text-sm">
-                      Tech Market Pricing in Nigeria
-                    </Text>
+                    <button type="submit" className="rounded-full bg-emerald-600 px-3 py-2 text-sm font-semibold text-white">
+                      Send
+                    </button>
+                  </form>
+                </Box>
+              ) : null}
+
+              {activeTab === 'people' ? (
+                <Box className="flex flex-col gap-3">
+                  <Text className="text-sm text-slate-400">
+                    {participants.length} in the room • {handRaisedCount} hand{handRaisedCount === 1 ? '' : 's'} raised • {speakingCount} on stage
+                  </Text>
+
+                  <Box className="flex flex-wrap gap-2">
+                    {(
+                      [
+                        { key: 'all', label: `All (${participants.length})` },
+                        { key: 'raised', label: `Hands raised (${handRaisedCount})` },
+                        { key: 'speaking', label: `On stage (${speakingCount})` },
+                      ] as { key: QueueFilter; label: string }[]
+                    ).map((filter) => (
+                      <Button
+                        key={filter.key}
+                        onPress={() => setQueueFilter(filter.key)}
+                        className={
+                          queueFilter === filter.key
+                            ? 'rounded-full bg-emerald-600 px-3 py-1.5'
+                            : 'rounded-full border border-slate-700 bg-slate-900 px-3 py-1.5'
+                        }
+                      >
+                        <ButtonText className="text-xs font-semibold text-white">{filter.label}</ButtonText>
+                      </Button>
+                    ))}
                   </Box>
-                  <Button className="h-7 shrink-0 rounded-full px-3 py-0 bg-emerald-600 md:hidden">
-                    <ButtonText className="text-[11px] font-semibold text-white">
-                      Join
-                    </ButtonText>
-                  </Button>
-                </Box>
 
-                <Box className="hidden items-center justify-between gap-2 mt-4 md:flex md:flex-col">
-                  <Text className="text-xs text-slate-400 dark:text-slate-300">
-                    Starts In
-                  </Text>
-                  <Text className="text-lg font-bold text-slate-900 dark:text-slate-100">
-                    05 : 56 : 43
-                  </Text>
-                  <Button className="mt-1 w-full bg-emerald-600 hover:bg-emerald-700 py-2 rounded-xl">
-                    <Text className="text-xs font-semibold text-white">
-                      Join Hangout
-                    </Text>
-                  </Button>
-                </Box>
-              </Card>
+                  <Box className="flex flex-col gap-2">
+                    {visibleParticipants.length === 0 ? (
+                      <Box className="p-4 text-center">
+                        <Text className="text-sm text-slate-400">No one matches this filter right now.</Text>
+                      </Box>
+                    ) : (
+                      visibleParticipants.map((participant) => (
+                        <Box key={participant.id} className="rounded-2xl border border-slate-800 bg-slate-900/70 p-3">
+                          <Box className="flex items-center justify-between gap-2">
+                            <Box>
+                              <Text className="font-semibold text-white">{participant.name}</Text>
+                              <Text className="text-sm text-slate-400">{participant.skill}</Text>
+                            </Box>
+                            <Box className="rounded-full border border-slate-700 bg-slate-950 px-2.5 py-1">
+                              <Text className="text-[11px] uppercase tracking-[0.25em] text-slate-300">{participant.role}</Text>
+                            </Box>
+                          </Box>
 
-              {/* Desktop-only Footer aligned right below the Hangout card */}
-              <SiteFooter className="hidden md:block" />
+                          <Box className="mt-3 flex flex-wrap gap-2">
+                            {isAdmin ? (
+                              <>
+                                <Button onPress={() => admitSpeaker(participant.id)} className="rounded-full bg-emerald-600 px-3 py-2">
+                                  <ButtonText className="text-sm font-semibold text-white">Bring up</ButtonText>
+                                </Button>
+                                <Button onPress={() => muteParticipant(participant.id)} className="rounded-full border border-slate-700 bg-slate-950 px-3 py-2">
+                                  <ButtonText className="text-sm font-semibold text-slate-200">{participant.muted ? 'Unmute' : 'Mute'}</ButtonText>
+                                </Button>
+                                <Button onPress={() => shareScreen(participant.id)} className="rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-2">
+                                  <ButtonText className="text-sm font-semibold text-amber-300">
+                                    {participant.sharingScreen ? 'Stop screen' : 'Share screen'}
+                                  </ButtonText>
+                                </Button>
+                              </>
+                            ) : (
+                              <Box className="rounded-full border border-slate-700 bg-slate-950 px-3 py-2">
+                                <Text className="text-sm text-slate-300">{participant.handRaised ? 'Requested to speak' : 'Watching'}</Text>
+                              </Box>
+                            )}
+                          </Box>
+                        </Box>
+                      ))
+                    )}
+                  </Box>
+                </Box>
+              ) : null}
+
+              {activeTab === 'match' ? (
+                <Box className="flex flex-col gap-3">
+                  <Text className="text-sm text-slate-400">
+                    Admin can bring up matching challengers and let them share their screen while the audience watches the competition unfold.
+                  </Text>
+
+                  {spotlights.map((spotlight) => (
+                    <Box key={spotlight.id} className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
+                      <Text className="font-semibold text-white">{spotlight.name}</Text>
+                      <Text className="mt-1 text-sm text-slate-400">{spotlight.skill}</Text>
+                      <Text className="mt-2 text-xs uppercase tracking-[0.24em] text-amber-400">{spotlight.role}</Text>
+                    </Box>
+                  ))}
+                </Box>
+              ) : null}
             </Box>
           </Box>
         </Box>
-      </Box>
-
-      {/* Navigation Drawer Menu (Holds Mobile Footer for easy access) */}
-      <div
-        className={`fixed inset-y-0 left-0 z-50 w-72 -translate-x-full transform bg-slate-900 text-white shadow-2xl transition-transform duration-300 ease-out md:w-64 md:translate-x-0 md:shadow-none ${
-          mobileOpen ? 'translate-x-0' : ''
-        }`}
-        onClick={(event: MouseEvent<HTMLDivElement>) => event.stopPropagation()}
-      >
-        <Box className="flex h-full w-full flex-col p-6 overflow-y-auto scrollbar-hide">
-          <Box className="mb-6 flex-row items-center justify-between">
-            <Text className="text-emerald-400 text-xl font-bold">DevConnect</Text>
-            <img src="/icon/logo.png" className="h-10 w-10 rounded-[0.8em]" />
-            <button
-              type="button"
-              className="rounded-md p-2 text-slate-300 hover:bg-slate-800 hover:text-white md:hidden"
-              onClick={() => setMobileOpen(false)}
-              aria-label="Close navigation"
-            >
-              <CloseIcon className="h-4 w-4" />
-            </button>
-          </Box>
-
-          {/* Nav Items */}
-          <Box className="gap-1.5 mb-6">
-            {navItems.map((item) => (
-              <a
-                key={item.label}
-                href={item.href}
-                onClick={() => setMobileOpen(false)}
-                className={`flex items-center gap-3 rounded-xl border px-4 py-3 text-sm font-medium transition duration-200 ${
-                  item.active
-                    ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300 shadow-[inset_0_0_0_1px_rgba(16,185,129,0.15)]'
-                    : 'border-transparent text-slate-300 hover:bg-slate-800 hover:text-white'
-                }`}
-              >
-                <span className={item.active ? 'text-emerald-300' : 'text-emerald-400'}>{item.icon}</span>
-                <span className={item.active ? 'font-semibold' : 'font-medium'}>{item.label}</span>
-              </a>
-            ))}
-          </Box>
-
-          {/* User Profile Card */}
-          <Box className="mb-6 rounded-xl border border-slate-800 bg-slate-800/60 p-4">
-            <a className="flex items-center gap-3 rounded-lg py-2 text-sm font-medium text-slate-300">
-              <Avatar className="h-8 w-8">
-                <AvatarImage
-                  source={{
-                    uri: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxzZWFyY2h8Mnx8dXNlcnxlbnwwfHwwfHw%3D&auto=format&fit=crop&w=800&q=60',
-                  }}
-                />
-              </Avatar>
-              <Text className="text-slate-100 text-sm font-semibold">Sighter Tech</Text>
-            </a>
-            <Pressable onPress={handleCreateTopic} className="mt-3 flex items-center justify-center rounded-xl bg-emerald-600 px-4 py-2.5 text-center text-xs font-bold text-white transition hover:bg-emerald-700">
-              <Text className="text-sm font-semibold text-white">Create Topic</Text>
-            </Pressable>
-          </Box>
-
-          {/* Mobile Footer Inside Drawer */}
-          <Box className="mt-auto pt-4 border-t border-slate-800 md:hidden">
-            <SiteFooter className="border-0 bg-transparent p-0" />
-          </Box>
-        </Box>
-      </div>
-
-      {showScrollTop ? (
-        <button
-          type="button"
-          onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-          aria-label="Scroll to top"
-          className="fixed bottom-6 right-6 z-50 inline-flex h-12 w-12 items-center justify-center rounded-full bg-slate-900 text-slate-100 shadow-lg shadow-slate-950/20 transition hover:bg-slate-700 dark:bg-slate-100 dark:text-slate-950 dark:hover:bg-slate-200"
-        >
-          <Icon as={ArrowUpIcon} className="h-5 w-5" />
-        </button>
-      ) : null}
-
-      {/* Replies Modal (simple inline) */}
-      {activeReplies ? (
-        (() => {
-          const post = feedPosts.find((p) => p.id === activeReplies);
-          if (!post) return null;
-          return (
-            <div className="fixed inset-0 z-50 flex items-end justify-center md:items-center">
-              <div className="absolute inset-0 bg-slate-900/50" onClick={closeReplies} />
-              <div className="relative z-10 w-full max-w-lg rounded-t-2xl bg-white p-4 shadow-xl dark:bg-slate-900 md:rounded-2xl md:p-6">
-                <div className="flex items-center justify-between">
-                  <Text className="font-semibold">Replies</Text>
-                  <button type="button" onClick={closeReplies} className="text-sm text-slate-500">Close</button>
-                </div>
-
-                <div className="mt-3 max-h-64 overflow-y-auto">
-                  {post.replies.length === 0 ? (
-                    <Text className="text-sm text-slate-500">No replies yet.</Text>
-                  ) : (
-                    post.replies.map((r) => (
-                      <Box key={r.id} className="mb-3">
-                        <Text className="font-semibold">{r.name}</Text>
-                        <Text className="text-sm text-slate-600 dark:text-slate-300">{r.text}</Text>
-                      </Box>
-                    ))
-                  )}
-                </div>
-              </div>
-            </div>
-          );
-        })()
-      ) : null}
-
-      {/* Drawer Overlay Backdrop */}
-      {mobileOpen ? (
-        <button
-          type="button"
-          className="fixed inset-0 z-40 bg-slate-950/50 md:hidden backdrop-blur-xs"
-          onClick={() => setMobileOpen(false)}
-          aria-label="Close navigation overlay"
-        />
       ) : null}
     </Box>
   );
