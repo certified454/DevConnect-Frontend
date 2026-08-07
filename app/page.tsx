@@ -80,6 +80,8 @@ function SparkIcon({ className = 'h-5 w-5' }: { className?: string }) {
 }
 
 const nigerianStates = NaijaStates.states();
+const HANGOUT_STORAGE_KEY = 'devconnect-joined-hangouts';
+const HANGOUT_ID = 'devconnect-hangout-1';
 
 const feedPosts = [
   {
@@ -204,6 +206,7 @@ export default function Home() {
   const [activeReplies, setActiveReplies] = useState<string | null>(null);
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [showScrollTop, setShowScrollTop] = useState(false);
+  const [joinedHangouts, setJoinedHangouts] = useState<string[]>([]);
 
   const router = useRouter();
   const pathname = usePathname();
@@ -233,6 +236,32 @@ export default function Home() {
 
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    try {
+      const stored = window.localStorage.getItem(HANGOUT_STORAGE_KEY);
+      const parsed = stored ? (JSON.parse(stored) as string[]) : [];
+      setJoinedHangouts(parsed);
+    } catch {
+      setJoinedHangouts([]);
+    }
+  }, []);
+
+  const handleJoinHangout = () => {
+    const updated = joinedHangouts.includes(HANGOUT_ID)
+      ? joinedHangouts
+      : [...joinedHangouts, HANGOUT_ID];
+
+    setJoinedHangouts(updated);
+
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(HANGOUT_STORAGE_KEY, JSON.stringify(updated));
+    }
+
+    router.push('/hangout');
+  };
 
   const handleSignIn = () => {
     router.push('/auth/signin');
@@ -501,9 +530,12 @@ export default function Home() {
                       Tech Market Pricing in Nigeria
                     </Text>
                   </Box>
-                  <Button className="h-7 shrink-0 rounded-full px-3 py-0 bg-emerald-600 md:hidden">
+                  <Button
+                    onPress={handleJoinHangout}
+                    className={joinedHangouts.includes(HANGOUT_ID) ? 'h-7 shrink-0 rounded-full px-3 py-0 bg-slate-500 md:hidden' : 'h-7 shrink-0 rounded-full px-3 py-0 bg-emerald-600 md:hidden'}
+                  >
                     <ButtonText className="text-[11px] font-semibold text-white">
-                      Join
+                      {joinedHangouts.includes(HANGOUT_ID) ? 'Joined' : 'Join'}
                     </ButtonText>
                   </Button>
                 </Box>
@@ -515,9 +547,12 @@ export default function Home() {
                   <Text className="text-lg font-bold text-slate-900 dark:text-slate-100">
                     05 : 56 : 43
                   </Text>
-                  <Button className="mt-1 w-full bg-emerald-600 hover:bg-emerald-700 py-2 rounded-xl">
+                  <Button
+                    onPress={handleJoinHangout}
+                    className={joinedHangouts.includes(HANGOUT_ID) ? 'mt-1 w-full bg-slate-500 hover:bg-slate-600 py-2 rounded-xl' : 'mt-1 w-full bg-emerald-600 hover:bg-emerald-700 py-2 rounded-xl'}
+                  >
                     <Text className="text-xs font-semibold text-white">
-                      Join Hangout
+                      {joinedHangouts.includes(HANGOUT_ID) ? 'Joined' : 'Join Hangout'}
                     </Text>
                   </Button>
                 </Box>
