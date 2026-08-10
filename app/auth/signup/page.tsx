@@ -1,7 +1,13 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { FormEvent, useState } from 'react';
+import {
+  Toast,
+  ToastTitle,
+  ToastDescription,
+  useToast,
+} from '@/components/ui/toast';
 
 const languageOptions = [
   'JavaScript',
@@ -159,6 +165,10 @@ export default function SignUpPage() {
   const [ratings, setRatings] = useState<Record<string, number>>({});
   const [languageInput, setLanguageInput] = useState('');
   const [frameworkInput, setFrameworkInput] = useState('');
+  const [isloading, setIsLoading] = useState(false);
+  const toast = useToast();
+  const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, '') || 'http://localhost:5000';
+  const signupUrl = `${apiBaseUrl}/api/auth/register`;
 
   const addSkill = (
     value: string,
@@ -193,6 +203,31 @@ export default function SignUpPage() {
     if (/[0-9]/.test(value)) score += 1;
     if (/[^A-Za-z0-9]/.test(value)) score += 1;
     return score;
+  };
+
+  const showToast = (title: string, message: string, action: 'success' | 'error') => {
+    toast.show({
+      render: ({ id }) => (
+        <Toast
+          key={id}
+          action={action}
+          className={`backdrop-blur-xl border shadow-2xl rounded-2xl p-4 text-white transition-all ${
+            action === 'success'
+              ? 'bg-emerald-950/75 border-emerald-500/40 shadow-emerald-950/20'
+              : 'bg-red-950/75 border-red-500/40 shadow-red-950/20'
+          }`}
+        >
+          <ToastTitle className={`text-sl font-semibold ${
+            action === 'success' 
+              ? 'text-emerald-400' 
+              : 'text-red-400'
+          }`}>{title}</ToastTitle>
+          <ToastDescription className="text-xs opacity-90">{message}</ToastDescription>
+        </Toast>
+      ),
+      placement: 'top',
+      duration: 5000,
+    });
   };
 
   const passwordStrength = getPasswordStrength(password);
@@ -286,6 +321,58 @@ export default function SignUpPage() {
       </div>
     ));
 
+  const handleSignUp = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setIsLoading(true);
+
+    try {
+      const res = await fetch(signupUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username,
+          email,
+          phone,
+          password,
+          confirmPassword,
+          languages: selectedLanguages,
+          frameworks: selectedFrameworks,
+        }),
+      });
+
+      const contentType = res.headers.get('content-type') ?? '';
+      const data =
+        contentType.includes('application/json') && res.status !== 204
+          ? await res.json()
+          : null;
+
+      if (!res.ok) {
+        const message =
+          data?.message ||
+          (await res.text()) ||
+          'Signup failed with an unexpected response.';
+        showToast('Signup failed', message, 'error');
+        return;
+      }
+
+      showToast(
+        'Signup successful',
+        data?.message || 'Account created successfully.',
+        'success'
+      );
+    } catch (error) {
+      showToast(
+        'Signup failed',
+        error instanceof Error
+          ? error.message
+          : 'Unable to reach signup endpoint.',
+        'error'
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(251,191,36,0.18),_transparent_35%),linear-gradient(135deg,_#f8fafc_0%,_#eefbf6_100%)] px-4 py-8 text-slate-900 sm:px-6 lg:px-8">
       <div className="mx-auto flex max-w-6xl flex-col overflow-hidden rounded-[32px] border border-white/70 bg-white/85 shadow-[0_25px_90px_rgba(15,23,42,0.12)] backdrop-blur-xl lg:flex-row">
@@ -329,7 +416,7 @@ export default function SignUpPage() {
             </Link>
           </div>
 
-          <form className="space-y-4">
+          <form onSubmit={handleSignUp} className="space-y-4">
             <div className="rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3">
               <label htmlFor="username" className="mb-2 block text-sm font-medium text-slate-700">
                 Username
@@ -464,9 +551,36 @@ export default function SignUpPage() {
 
             <button
               type="submit"
-              className="w-full rounded-full bg-emerald-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-500"
+              disabled={isloading}
+              className="flex w-full items-center justify-center gap-2 rounded-full bg-emerald-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-75"
             >
-              Create account
+              {isloading ? (
+                <>
+                  <svg
+                    className="h-5 w-5 animate-spin text-white"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    />
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    />
+                  </svg>
+                  <span>Creating account...</span>
+                </>
+              ) : (
+                'Create account'
+              )}
             </button>
           </form>
 
