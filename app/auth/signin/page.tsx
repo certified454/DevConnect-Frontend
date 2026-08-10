@@ -1,12 +1,97 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { FormEvent, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { 
+  Toast, 
+  ToastDescription, 
+  ToastTitle,
+  useToast
+} from '@/components/ui/toast';
 
 export default function SignInPage() {
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
+  const toast = useToast();
+
+  const router = useRouter();
+
+  // API URL targeting backend route
+  const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, '');
+  const signURL = `${apiBaseUrl}/api/auth/login`;
+
+  // Function to display toast notifications
+  const showToast = (title: string, message: string, action: 'success' | 'error') => {
+    toast.show({
+      render: ({ id }) => (
+        <Toast
+          key={id}
+          action={action}
+          className={`backdrop-blur-xl border shadow-2xl rounded-2xl p-4 text-white transition-all ${
+            action === 'success'
+              ? 'bg-emerald-950/75 border-emerald-500/40 shadow-emerald-950/20'
+              : 'bg-red-950/75 border-red-500/40 shadow-red-950/20'
+          }`}
+        >
+          <ToastTitle className={`text-sm font-semibold ${
+            action === 'success' ? 'text-emerald-400' : 'text-red-400'
+          }`}>
+            {title}
+          </ToastTitle>
+          <ToastDescription className="text-xs opacity-90">{message}</ToastDescription>
+        </Toast>
+      ),
+      placement: 'top',
+      duration: 5000,
+    });
+  };
+
+  // Handle form submission for sign-in
+  const handleSignIn = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setIsLoading(true);
+
+    try {
+      const res = await fetch(signURL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ username, password }),
+      });
+
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        const errorMessage = data?.message || "Login failed. Please check your credentials.";
+        showToast('Login Failed', errorMessage, 'error');
+        return;
+      }
+
+      // Store auth token depending on 'Remember Me' preference
+      if (data?.token) {
+        if (rememberMe) {
+          localStorage.setItem('authToken', data.token);
+        } else {
+          sessionStorage.setItem('authToken', data.token);
+        }
+      }
+
+      showToast('Successful', data?.message || 'Signed in successfully.', 'success');
+      
+      router.push('/');
+      router.refresh();
+    } catch (error) {
+      const errMessage = error instanceof Error ? error.message : 'Unable to connect to server. Please try again.';
+      showToast('Connection Error', errMessage, 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(251,191,36,0.18),_transparent_35%),linear-gradient(135deg,_#f8fafc_0%,_#eefbf6_100%)] px-4 py-8 text-slate-900 sm:px-6 lg:px-8">
@@ -16,19 +101,15 @@ export default function SignInPage() {
             DevConnect
           </div>
 
-          <h1 className="mt-6 md:text-3xl text-1xl font-semibold leading-tight sm:text-4xl">
-            Welcome back to your next big connection from
+          <h1 className="mt-6 text-2xl font-semibold leading-tight sm:text-4xl">
+            Welcome back to your next big connection
           </h1>
-          {/* <p className="mt-4 text-sm leading-7 text-slate-300 sm:text-base">
-            Sign in to discover developer circles, join thoughtful discussions, and stay close to the people shaping the next wave of tech in Nigeria.
-          </p> */}
 
           <div className="mt-6 space-y-3">
             {[
               'Fresh opportunities shared daily',
               'Real conversations with builders',
               'And a smarter way to connect',
-              
             ].map((item) => (
               <div key={item} className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-slate-200">
                 {item}
@@ -43,26 +124,27 @@ export default function SignInPage() {
               <p className="text-sm font-semibold uppercase tracking-[0.3em] text-emerald-600">
                 Sign in
               </p>
-              <h2 className="mt-2 text-1xl md:text-2xl font-semibold text-slate-900 sm:text-3xl">
+              <h2 className="mt-2 text-2xl font-semibold text-slate-900 sm:text-3xl">
                 Access your account
               </h2>
             </div>
-            <Link href="/" className="mt-6 inline-flex items-center justify-center rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700">
+            <Link href="/" className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700">
               Back home
             </Link>
           </div>
 
-          <form className="space-y-4">
+          <form onSubmit={handleSignIn} className="space-y-4">
             <div className="rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3">
-              <label htmlFor="email" className="mb-2 block text-sm font-medium text-slate-700">
-                Email address
+              <label htmlFor="username" className="mb-2 block text-sm font-medium text-slate-700">
+                Username
               </label>
               <input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@example.com"
+                id="username"
+                type="text"
+                required
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="Enter your username"
                 className="w-full border-0 bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400"
               />
             </div>
@@ -83,6 +165,7 @@ export default function SignInPage() {
               <input
                 id="password"
                 type={showPassword ? 'text' : 'password'}
+                required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Enter your password"
@@ -92,7 +175,12 @@ export default function SignInPage() {
 
             <div className="flex items-center justify-between text-sm">
               <label className="flex items-center gap-2 text-slate-600">
-                <input type="checkbox" className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500" />
+                <input
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                  className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                />
                 Remember me
               </label>
               <a href="#" className="font-medium text-emerald-600 transition hover:text-emerald-700">
@@ -102,9 +190,36 @@ export default function SignInPage() {
 
             <button
               type="submit"
-              className="w-full rounded-full bg-amber-500 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-amber-400"
+              disabled={isLoading}
+              className="flex w-full items-center justify-center gap-2 rounded-full bg-emerald-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-75"
             >
-              Sign in
+              {isLoading ? (
+                <>
+                  <svg
+                    className="h-5 w-5 animate-spin text-white"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    />
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    />
+                  </svg>
+                  <span>Signing in...</span>
+                </>
+              ) : (
+                'Sign in'
+              )}
             </button>
           </form>
 

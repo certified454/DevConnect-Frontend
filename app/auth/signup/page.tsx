@@ -1,14 +1,16 @@
 'use client';
 
 import Link from 'next/link';
-import { FormEvent, useState } from 'react';
+import { useState } from 'react';
 import {
   Toast,
   ToastTitle,
   ToastDescription,
   useToast,
 } from '@/components/ui/toast';
+import { useRouter } from 'next/navigation';
 
+// List of programming languages and frameworks for selection
 const languageOptions = [
   'JavaScript',
   'TypeScript',
@@ -52,6 +54,7 @@ const languageOptions = [
   'Verilog',
 ];
 
+// List of frameworks and tools for selection
 const frameworkOptions = [
   'React',
   'Next.js',
@@ -145,6 +148,7 @@ const frameworkOptions = [
 
 const MAX_LANGUAGES = 5;
 const MAX_FRAMEWORKS = 8;
+// Mapping of rating values to descriptive labels for skill proficiency
 const ratingLabels: Record<number, string> = {
   1: 'Learning',
   2: 'Beginner',
@@ -154,6 +158,8 @@ const ratingLabels: Record<number, string> = {
 };
 
 export default function SignUpPage() {
+  // State variables for form inputs and UI states
+
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
@@ -165,11 +171,16 @@ export default function SignUpPage() {
   const [ratings, setRatings] = useState<Record<string, number>>({});
   const [languageInput, setLanguageInput] = useState('');
   const [frameworkInput, setFrameworkInput] = useState('');
-  const [isloading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const toast = useToast();
-  const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, '') || 'http://localhost:5000';
+
+  const router = useRouter();
+
+  // API URL targeting SignUp backend route
+  const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, '');
   const signupUrl = `${apiBaseUrl}/api/auth/register`;
 
+  // List of Skills
   const addSkill = (
     value: string,
     list: string[],
@@ -183,19 +194,23 @@ export default function SignUpPage() {
     setInput('');
   };
 
+  // Remove a skill from the list
   const removeSkill = (value: string, list: string[], setter: (value: string[]) => void) => {
     setter(list.filter((item) => item !== value));
   };
 
+  // Update the rating for a specific skill
   const updateRating = (skill: string, value: number) => {
     setRatings((prev) => ({ ...prev, [skill]: value }));
   };
 
+  // Handle username input change and ensure it starts with '@'
   const handleUsernameChange = (value: string) => {
     const cleaned = value.trim().replace(/^@+/, '');
     setUsername(`@${cleaned}`);
   };
 
+  // Calculate password strength based on length, uppercase, number, and special character
   const getPasswordStrength = (value: string) => {
     let score = 0;
     if (value.length >= 8) score += 1;
@@ -205,6 +220,7 @@ export default function SignUpPage() {
     return score;
   };
 
+  // Show toast notification for success or error messages
   const showToast = (title: string, message: string, action: 'success' | 'error') => {
     toast.show({
       render: ({ id }) => (
@@ -230,6 +246,7 @@ export default function SignUpPage() {
     });
   };
 
+  // Determine password strength and corresponding color and label
   const passwordStrength = getPasswordStrength(password);
   const strengthColor =
     passwordStrength <= 1
@@ -297,6 +314,7 @@ export default function SignUpPage() {
     </div>
   );
 
+  // Render the selected skills with their ratings and a slider to adjust proficiency
   const renderSelectedSkills = (selectedItems: string[]) =>
     selectedItems.map((item) => (
       <div key={item} className="rounded-2xl border border-slate-200 bg-slate-50/80 p-3">
@@ -321,8 +339,8 @@ export default function SignUpPage() {
       </div>
     ));
 
-  const handleSignUp = async (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
+  // Handle the signup form submission, send data to the backend, and manage responses
+  const handleSignUp = async () => {
     setIsLoading(true);
 
     try {
@@ -351,18 +369,19 @@ export default function SignUpPage() {
           data?.message ||
           (await res.text()) ||
           'Signup failed with an unexpected response.';
-        showToast('Signup failed', message, 'error');
+        showToast('Failed', message, 'error');
         return;
       }
 
       showToast(
-        'Signup successful',
+        'Successful',
         data?.message || 'Account created successfully.',
         'success'
       );
+      router.push('/auth/signin');
     } catch (error) {
       showToast(
-        'Signup failed',
+        'Failed',
         error instanceof Error
           ? error.message
           : 'Unable to reach signup endpoint.',
@@ -551,10 +570,10 @@ export default function SignUpPage() {
 
             <button
               type="submit"
-              disabled={isloading}
+              disabled={isLoading}
               className="flex w-full items-center justify-center gap-2 rounded-full bg-emerald-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-75"
             >
-              {isloading ? (
+              {isLoading ? (
                 <>
                   <svg
                     className="h-5 w-5 animate-spin text-white"
