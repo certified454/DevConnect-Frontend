@@ -1,8 +1,17 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
+import {
+  Toast,
+  ToastTitle,
+  ToastDescription,
+  useToast,
+} from '@/components/ui/toast';
+import { useRouter } from 'next/navigation';
+import { COUNTRIES, type Country } from '@/lib/countries';
 
+// List of programming languages and frameworks for selection
 const languageOptions = [
   'JavaScript',
   'TypeScript',
@@ -139,6 +148,7 @@ const frameworkOptions = [
 
 const MAX_LANGUAGES = 5;
 const MAX_FRAMEWORKS = 8;
+
 const ratingLabels: Record<number, string> = {
   1: 'Learning',
   2: 'Beginner',
@@ -148,9 +158,14 @@ const ratingLabels: Record<number, string> = {
 };
 
 export default function SignUpPage() {
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
+  const [profilePic, setProfilePic] = useState('');
+  const [country, setCountry] = useState<Country>(
+    COUNTRIES.find((item) => item.code === 'NG') ?? COUNTRIES[0]
+  );
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -159,6 +174,13 @@ export default function SignUpPage() {
   const [ratings, setRatings] = useState<Record<string, number>>({});
   const [languageInput, setLanguageInput] = useState('');
   const [frameworkInput, setFrameworkInput] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+
+  const toast = useToast();
+  const router = useRouter();
+
+  const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, '');
+  const signupUrl = `${apiBaseUrl}/api/auth/register`;
 
   const addSkill = (
     value: string,
@@ -193,6 +215,65 @@ export default function SignUpPage() {
     if (/[0-9]/.test(value)) score += 1;
     if (/[^A-Za-z0-9]/.test(value)) score += 1;
     return score;
+  };
+
+  const convertFileToBase64 = (file: File): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result;
+        if (typeof result === 'string') {
+          resolve(result);
+        } else {
+          reject(new Error('Unable to convert file to base64.'));
+        }
+      };
+      reader.onerror = () => reject(new Error('File reading error.'));
+      reader.readAsDataURL(file);
+    });
+
+  const handleProfilePicPick = async () => {
+    if (!fileInputRef.current) return;
+    fileInputRef.current.click();
+  };
+
+  const handleProfilePicChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const base64String = await convertFileToBase64(file);
+      setProfilePic(base64String);
+    } catch (error) {
+      showToast(
+        'Failed',
+        error instanceof Error ? error.message : 'Unable to process the selected image.',
+        'error'
+      );
+    }
+  };
+
+  const showToast = (title: string, message: string, action: 'success' | 'error') => {
+    toast.show({
+      render: ({ id }) => (
+        <Toast
+          key={id}
+          action={action}
+          className={`backdrop-blur-xl border shadow-2xl rounded-2xl p-4 text-white transition-all ${
+            action === 'success'
+              ? 'bg-emerald-950/75 border-emerald-500/40 shadow-emerald-950/20'
+              : 'bg-red-950/75 border-red-500/40 shadow-red-950/20'
+          }`}
+        >
+          <ToastTitle className={`text-sl font-semibold ${
+            action === 'success' ? 'text-emerald-400' : 'text-red-400'
+          }`}>{title}</ToastTitle>
+          <ToastDescription className="text-xs opacity-90">{message}</ToastDescription>
+        </Toast>
+      ),
+      placement: 'top',
+      duration: 5000,
+    });
   };
 
   const passwordStrength = getPasswordStrength(password);
@@ -286,6 +367,61 @@ export default function SignUpPage() {
       </div>
     ));
 
+  const handleSignUp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+
+    try {
+      const res = await fetch(signupUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username,
+          email,
+          phoneNumber: `${country.dialCode}${phone.replace(/\D/g, '')}`,
+          country,
+          profilePic,
+          password,
+          confirmPassword,
+          languages: selectedLanguages,
+          frameworks: selectedFrameworks,
+        }),
+      });
+
+      const contentType = res.headers.get('content-type') ?? '';
+      const data =
+        contentType.includes('application/json') && res.status !== 204
+          ? await res.json()
+          : null;
+
+      if (!res.ok) {
+        const message =
+          data?.message ||
+          (await res.text()) ||
+          'Signup failed with an unexpected response.';
+        showToast('Failed', message, 'error');
+        return;
+      }
+
+      showToast(
+        'Successful',
+        data?.message || 'Account created successfully. Check your email for the verification code.',
+        'success'
+      );
+      router.push(`/auth/verify?email=${encodeURIComponent(email)}`);
+    } catch (error) {
+      showToast(
+        'Failed',
+        error instanceof Error
+          ? error.message
+          : 'Unable to reach signup endpoint.',
+        'error'
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(251,191,36,0.18),_transparent_35%),linear-gradient(135deg,_#f8fafc_0%,_#eefbf6_100%)] px-4 py-8 text-slate-900 sm:px-6 lg:px-8">
       <div className="mx-auto flex max-w-6xl flex-col overflow-hidden rounded-[32px] border border-white/70 bg-white/85 shadow-[0_25px_90px_rgba(15,23,42,0.12)] backdrop-blur-xl lg:flex-row">
@@ -329,7 +465,39 @@ export default function SignUpPage() {
             </Link>
           </div>
 
-          <form className="space-y-4">
+          <form onSubmit={handleSignUp} className="space-y-4">
+            {/* Profile Picture Picker & Live Preview */}
+            <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
+              <label className="mb-2 block text-sm font-medium text-slate-700">
+                Profile picture
+              </label>
+              <div className="flex flex-row gap-3 sm:flex-row sm:items-center">
+                <div className="h-16 w-16 shrink-0 overflow-hidden rounded-full border border-slate-300 bg-slate-200 flex items-center justify-center text-slate-400">
+                  {profilePic ? (
+                    <img src={profilePic} alt="Avatar Preview" className="h-full w-full object-cover" />
+                  ) : (
+                    <span className="text-xs text-center text-slate-400">Profile here</span>
+                  )}
+                </div>
+                <div className="flex flex-col gap-2 mt-3 ml-3">
+                  <button
+                    type="button"
+                    onClick={handleProfilePicPick}
+                    className="inline-flex items-center justify-center rounded-2xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-500"
+                  >
+                    Select profile picture
+                  </button>
+                </div>
+              </div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleProfilePicChange}
+              />
+            </div>
+
             <div className="rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3">
               <label htmlFor="username" className="mb-2 block text-sm font-medium text-slate-700">
                 Username
@@ -358,18 +526,47 @@ export default function SignUpPage() {
               />
             </div>
 
+            {/* Country Selector */}
+            <div className="rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3">
+              <label htmlFor="country" className="mb-2 block text-sm font-medium text-slate-700">
+                Country
+              </label>
+              <select
+                id="country"
+                value={country.code}
+                onChange={(e) => {
+                  const selectedCountry = COUNTRIES.find((item) => item.code === e.target.value);
+                  if (selectedCountry) {
+                    setCountry(selectedCountry);
+                  }
+                }}
+                className="w-full border-0 bg-transparent text-sm text-slate-900 outline-none"
+              >
+                {COUNTRIES.map((item) => (
+                  <option key={item.code} value={item.code}>
+                    {item.name} ({item.dialCode})
+                  </option>
+                ))}
+              </select>
+            </div>
+
             <div className="rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3">
               <label htmlFor="signup-phone" className="mb-2 block text-sm font-medium text-slate-700">
                 Phone number
               </label>
-              <input
-                id="signup-phone"
-                type="tel"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder="+234 812 345 6789"
-                className="w-full border-0 bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400"
-              />
+              <div className="flex items-center gap-2">
+                <span className="rounded-2xl bg-slate-100 border border-slate-200 px-3 py-2 text-sm text-slate-600">
+                  {country.dialCode}
+                </span>
+                <input
+                  id="signup-phone"
+                  type="tel"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value.replace(/[^0-9\s()-]/g, ''))}
+                  placeholder="812 345 6789"
+                  className="min-w-0 flex-1 border-0 bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400"
+                />
+              </div>
             </div>
 
             <div className="rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3">
@@ -458,15 +655,42 @@ export default function SignUpPage() {
             </div>
 
             <label className="flex items-start gap-2 text-sm text-slate-600">
-              <input type="checkbox" className="mt-1 h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500" />
+              <input type="checkbox" required className="mt-1 h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500" />
               <span>I agree to the community guidelines and privacy policy.</span>
             </label>
 
             <button
               type="submit"
-              className="w-full rounded-full bg-emerald-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-500"
+              disabled={isLoading}
+              className="flex w-full items-center justify-center gap-2 rounded-full bg-emerald-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-75"
             >
-              Create account
+              {isLoading ? (
+                <>
+                  <svg
+                    className="h-5 w-5 animate-spin text-white"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    />
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    />
+                  </svg>
+                  <span>Creating account...</span>
+                </>
+              ) : (
+                'Create account'
+              )}
             </button>
           </form>
 
