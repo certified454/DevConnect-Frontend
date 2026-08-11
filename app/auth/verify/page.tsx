@@ -1,11 +1,11 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Toast, ToastDescription, ToastTitle, useToast } from '@/components/ui/toast';
 
-export default function VerifyPage() {
+function VerifyContent() {
   const searchParams = useSearchParams();
   const initialEmail = searchParams?.get('email') ?? '';
 
@@ -51,7 +51,9 @@ export default function VerifyPage() {
     });
   };
 
-  const handleVerify = async () => {
+  const handleVerify = async (e: React.FormEvent) => {
+    e.preventDefault();
+
     if (!email.trim() || !code.trim()) {
       showToast('Missing info', 'Please enter your email and verification code.', 'error');
       return;
@@ -195,5 +197,17 @@ export default function VerifyPage() {
         </div>
       </div>
     </main>
+  );
+}
+
+export default function VerifyPage() {
+  return (
+    <Suspense fallback={
+      <main className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-600 text-sm">
+        Loading page verification...
+      </main>
+    }>
+      <VerifyContent />
+    </Suspense>
   );
 }
