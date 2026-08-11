@@ -124,11 +124,11 @@ export default function SignInPage() {
               <p className="text-sm font-semibold uppercase tracking-[0.3em] text-emerald-600">
                 Sign in
               </p>
-              <h2 className="mt-2 text-2xl font-semibold text-slate-900 sm:text-3xl">
+              <h2 className="mt-2 text-1xl md:text-2xl font-semibold text-slate-900 sm:text-3xl">
                 Access your account
               </h2>
             </div>
-            <Link href="/" className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700">
+            <Link href="/" className="inline-flex mt-6 items-center justify-center rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700">
               Back home
             </Link>
           </div>
@@ -222,6 +222,17 @@ export default function SignInPage() {
               )}
             </button>
           </form>
+
+          <div className="mb-4 rounded-2xl border border-emerald-100 bg-emerald-50/80 p-4 text-sm text-slate-700">
+            <p className="font-medium text-slate-900">Need to verify your account?</p>
+            <p>
+              If you already created an account but did not verify it,{' '}
+              <Link href="/auth/verify" className="font-semibold text-emerald-600 transition hover:text-emerald-700">
+                click here to verify
+              </Link>
+              .
+            </p>
+          </div>
 
           <div className="my-6 flex items-center gap-3 text-sm text-slate-400">
             <div className="h-px flex-1 bg-slate-200" />
