@@ -165,24 +165,23 @@ function SiteFooter({ className = '' }: { className?: string }) {
 
         <Box className="flex flex-col gap-1.5">
           <Text className="text-[11px] font-bold text-slate-100 uppercase tracking-wider">Company</Text>
-          <a href="#about" className="text-[11px] text-slate-400 hover:text-emerald-400 transition-colors">About Us</a>
-          <a href="#privacy" className="text-[11px] text-slate-400 hover:text-emerald-400 transition-colors">Privacy</a>
-          <a href="#terms" className="text-[11px] text-slate-400 hover:text-emerald-400 transition-colors">Terms</a>
+          <a href="/company/aboutus" className="text-[11px] text-slate-400 hover:text-emerald-400 transition-colors">About Us</a>
+          <a href="/company/privacy" className="text-[11px] text-slate-400 hover:text-emerald-400 transition-colors">Privacy</a>
+          <a href="/company/terms" className="text-[11px] text-slate-400 hover:text-emerald-400 transition-colors">Terms</a>
         </Box>
 
         <Box className="flex flex-col gap-1.5">
           <Text className="text-[11px] font-bold text-slate-100 uppercase tracking-wider">Community</Text>
-          <a href="#rules" className="text-[11px] text-slate-400 hover:text-emerald-400 transition-colors">Guidelines</a>
-          <a href="#topics" className="text-[11px] text-slate-400 hover:text-emerald-400 transition-colors">Topics</a>
-          <a href="#help" className="text-[11px] text-slate-400 hover:text-emerald-400 transition-colors">Support</a>
-          <a href="#faq" className="text-[11px] text-slate-400 hover:text-emerald-400 transition-colors">FAQs</a>
+          <a href="/community/guideline" className="text-[11px] text-slate-400 hover:text-emerald-400 transition-colors">Guidelines</a>
+          <a href="/community/support" className="text-[11px] text-slate-400 hover:text-emerald-400 transition-colors">Support</a>
+          <a href="/community/faq" className="text-[11px] text-slate-400 hover:text-emerald-400 transition-colors">FAQs</a>
         </Box>
 
         <Box className="flex flex-col gap-1.5">
           <Text className="text-[11px] font-bold text-slate-100 uppercase tracking-wider">Connect</Text>
-          <a href="#contact" className="text-[11px] text-slate-400 hover:text-emerald-400 transition-colors">Contact</a>
-          <a href="#socials" className="text-[11px] text-slate-400 hover:text-emerald-400 transition-colors">Socials</a>
-          <a href="#newsletter" className="text-[11px] text-slate-400 hover:text-emerald-400 transition-colors">Newsletter</a>
+          <a href="/connect/contact" className="text-[11px] text-slate-400 hover:text-emerald-400 transition-colors">Contact</a>
+          <a href="/connect/socials" className="text-[11px] text-slate-400 hover:text-emerald-400 transition-colors">Socials</a>
+          <a href="/connect/newsletter" className="text-[11px] text-slate-400 hover:text-emerald-400 transition-colors">Newsletter</a>
         </Box>
       </Box>
 

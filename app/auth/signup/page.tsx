@@ -174,6 +174,7 @@ export default function SignUpPage() {
   const [ratings, setRatings] = useState<Record<string, number>>({});
   const [languageInput, setLanguageInput] = useState('');
   const [frameworkInput, setFrameworkInput] = useState('');
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
   const toast = useToast();
@@ -369,6 +370,12 @@ export default function SignUpPage() {
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!acceptedTerms) {
+      showToast('Action Required', 'You must accept the Terms of Use and Privacy Policy to continue.', 'error');
+      return;
+    }
+
     setIsLoading(true);
 
     try {
@@ -385,6 +392,7 @@ export default function SignUpPage() {
           confirmPassword,
           languages: selectedLanguages,
           frameworks: selectedFrameworks,
+          acceptedTerms,
         }),
       });
 
@@ -654,15 +662,33 @@ export default function SignUpPage() {
               </div>
             </div>
 
-            <label className="flex items-start gap-2 text-sm text-slate-600">
-              <input type="checkbox" required className="mt-1 h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500" />
-              <span>I agree to the community guidelines and privacy policy.</span>
+            {/* Terms of Use & Privacy Policy Agreement */}
+            <label htmlFor="terms" className="flex items-start gap-3 cursor-pointer text-sm text-slate-600">
+              <input
+                id="terms"
+                type="checkbox"
+                required
+                checked={acceptedTerms}
+                onChange={(e) => setAcceptedTerms(e.target.checked)}
+                className="mt-1 h-4 w-4 shrink-0 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+              />
+              <span>
+                I have read and agree to the{' '}
+                <Link href="/terms" target="_blank" className="font-semibold text-emerald-600 underline hover:text-emerald-700">
+                  Terms of Use
+                </Link>{' '}
+                and{' '}
+                <Link href="/privacy" target="_blank" className="font-semibold text-emerald-600 underline hover:text-emerald-700">
+                  Privacy Policy
+                </Link>
+                .
+              </span>
             </label>
 
             <button
               type="submit"
-              disabled={isLoading}
-              className="flex w-full items-center justify-center gap-2 rounded-full bg-emerald-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-75"
+              disabled={isLoading || !acceptedTerms}
+              className="flex w-full items-center justify-center gap-2 rounded-full bg-emerald-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {isLoading ? (
                 <>
