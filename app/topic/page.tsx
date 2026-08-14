@@ -1,20 +1,118 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
-const categories = ['Frontend', 'Backend', 'Mobile', 'DevOps', 'AI/ML', 'Design', 'Product', 'Community'];
+const apiBaseUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000').replace(/\/$/, '');
+
+const programmingLanguages = [
+  'javascript',
+  'typescript',
+  'python',
+  'html',
+  'css',
+  'java',
+  'cpp',
+  'go',
+  'rust',
+  'php',
+  'sql',
+];
 
 export default function CreateTopicPage() {
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [category, setCategory] = useState('');
-  const [tags, setTags] = useState('');
-  const [isDraft, setIsDraft] = useState(false);
+  const router = useRouter();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Mongoose Model Fields
+  const [title, setTitle] = useState('');
+  const [content, setContent] = useState('');
+  const [codeSnippet, setCodeSnippet] = useState('');
+  const [language, setLanguage] = useState('');
+  const [imageUrl, setImageUrl] = useState('');
+  const [tags, setTags] = useState<string[]>([]);
+  const [tagInput, setTagInput] = useState('');
+
+  const addTag = (raw: string) => {
+    const t = raw.trim();
+    if (!t) return;
+    // ensure tag starts with '#'
+    const normalized = t.startsWith('#') ? t : `#${t}`;
+    if (tags.includes(normalized)) return;
+    setTags((s) => [...s, normalized]);
+    setTagInput('');
+  };
+
+  const removeTag = (t: string) => {
+    setTags((s) => s.filter((x) => x !== t));
+  };
+
+  const handleTagKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' || e.key === ',') {
+      e.preventDefault();
+      addTag(tagInput);
+    }
+  };
+
+  // UI state
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log({ title, description, category, tags, isDraft });
+    setError(null);
+
+    // Frontend validation matching controller requirements
+    if (!title.trim()) {
+      setError('Post title is required.');
+      return;
+    }
+    if (!content.trim()) {
+      setError('Post content cannot be empty.');
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      const token = localStorage.getItem('authToken') || sessionStorage.getItem('authToken');
+
+      if (!token) {
+        // Not authenticated -> redirect to signin
+        setLoading(false);
+        router.push('/auth/signin');
+        return;
+      }
+
+      const res = await fetch(`${apiBaseUrl}/api/posts`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          title,
+          content,
+          codeSnippet,
+          language,
+          imageUrl,
+          tags,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data?.message || 'Failed to create post.');
+      }
+
+      // Success -> Redirect to homepage / feed
+      router.push('/');
+    } catch (err: any) {
+      console.error('Create Post Error:', err);
+      setError(err.message || 'An unexpected error occurred.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -23,25 +121,35 @@ export default function CreateTopicPage() {
         <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
             <p className="text-sm font-semibold uppercase tracking-[0.3em] text-emerald-600">Create topic</p>
-            
             <p className="mt-2 max-w-2xl text-sm leading-7 text-slate-600">
               Share your idea, ask a question, or open a space for developers to collaborate around a real problem.
             </p>
           </div>
-          <Link href="/" className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700">
+          <Link
+            href="/"
+            className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700"
+          >
             Back home
           </Link>
         </div>
 
+        {error && (
+          <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+            {error}
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
+          {/* Main Inputs (Title & Content) */}
           <div className="space-y-4">
             <div className="rounded-3xl border border-slate-200 bg-slate-50/80 p-4 sm:p-5">
               <label htmlFor="title" className="mb-2 block text-sm font-semibold text-slate-700">
-                Topic title
+                Topic Title <span className="text-red-500">*</span>
               </label>
               <input
                 id="title"
                 type="text"
+                required
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="How do you structure a scalable Next.js app?"
@@ -50,68 +158,98 @@ export default function CreateTopicPage() {
             </div>
 
             <div className="rounded-3xl border border-slate-200 bg-slate-50/80 p-4 sm:p-5">
-              <label htmlFor="description" className="mb-2 block text-sm font-semibold text-slate-700">
-                What do you want to discuss?
+              <label htmlFor="content" className="mb-2 block text-sm font-semibold text-slate-700">
+                What do you want to discuss? <span className="text-red-500">*</span>
               </label>
               <textarea
-                id="description"
+                id="content"
+                required
                 rows={8}
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
+                value={content}
+                onChange={(e) => setContent(e.target.value)}
                 placeholder="Describe the problem, idea, question, or discussion you want the community to engage with..."
                 className="w-full resize-none border-0 bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400"
               />
             </div>
+
+            {/* Code Snippet Input */}
+            <div className="rounded-3xl border border-slate-200 bg-slate-50/80 p-4 sm:p-5">
+              <label htmlFor="codeSnippet" className="mb-2 block text-sm font-semibold text-slate-700">
+                Code Snippet <span className="text-xs font-normal text-slate-500">(optional)</span>
+              </label>
+              <textarea
+                id="codeSnippet"
+                rows={5}
+                value={codeSnippet}
+                onChange={(e) => setCodeSnippet(e.target.value)}
+                placeholder="// Paste code block here..."
+                className="w-full resize-none border-0 bg-transparent font-mono text-xs text-slate-900 outline-none placeholder:text-slate-400"
+              />
+            </div>
           </div>
 
+          {/* Right Sidebar Options */}
           <div className="space-y-4">
+            {/* Language Selector */}
             <div className="rounded-3xl border border-slate-200 bg-slate-50/80 p-4 sm:p-5">
-              <label htmlFor="category" className="mb-2 block text-sm font-semibold text-slate-700">
-                Category
+              <label htmlFor="language" className="mb-2 block text-sm font-semibold text-slate-700">
+                Code Language
               </label>
               <select
-                id="category"
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
+                id="language"
+                value={language}
+                onChange={(e) => setLanguage(e.target.value)}
                 className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none"
               >
-                <option value="">Choose a category</option>
-                {categories.map((item) => (
-                  <option key={item} value={item}>
-                    {item}
+                <option value="">Select language (optional)</option>
+                {programmingLanguages.map((lang) => (
+                  <option key={lang} value={lang}>
+                    {lang}
                   </option>
                 ))}
               </select>
             </div>
 
+            {/* Tags Input */}
             <div className="rounded-3xl border border-slate-200 bg-slate-50/80 p-4 sm:p-5">
               <label htmlFor="tags" className="mb-2 block text-sm font-semibold text-slate-700">
-                Tags
+                Tags <span className="text-xs font-normal text-slate-500">(add and press Enter)</span>
               </label>
+              <div className="mb-2 flex flex-wrap gap-2">
+                {tags.map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => removeTag(t)}
+                    className="rounded-full bg-emerald-50 px-3 py-1 text-xs text-emerald-700 border border-emerald-100"
+                  >
+                    {t} ×
+                  </button>
+                ))}
+              </div>
               <input
                 id="tags"
-                type="text"
-                value={tags}
-                onChange={(e) => setTags(e.target.value)}
-                placeholder="nextjs, react, performance"
+                value={tagInput}
+                onChange={(e) => setTagInput(e.target.value)}
+                onKeyDown={handleTagKeyDown}
+                placeholder="Add tags, e.g. performance, react"
                 className="w-full border-0 bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400"
               />
-              <p className="mt-2 text-xs text-slate-500">Separate tags with commas.</p>
             </div>
 
+            {/* Image URL Input */}
             <div className="rounded-3xl border border-slate-200 bg-slate-50/80 p-4 sm:p-5">
-              <label className="flex items-start gap-3 text-sm text-slate-700">
-                <input
-                  type="checkbox"
-                  checked={isDraft}
-                  onChange={() => setIsDraft((prev) => !prev)}
-                  className="mt-1 h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
-                />
-                <span>Save as draft first</span>
+              <label htmlFor="imageUrl" className="mb-2 block text-sm font-semibold text-slate-700">
+                Image URL
               </label>
-              <p className="mt-2 text-xs leading-6 text-slate-500">
-                Drafts are great when you want to refine the topic before publishing it live.
-              </p>
+              <input
+                id="imageUrl"
+                type="url"
+                value={imageUrl}
+                onChange={(e) => setImageUrl(e.target.value)}
+                placeholder="https://example.com/image.png"
+                className="w-full border-0 bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400"
+              />
             </div>
 
             <div className="rounded-3xl border border-emerald-200 bg-emerald-50/70 p-4 sm:p-5">
@@ -119,16 +257,17 @@ export default function CreateTopicPage() {
               <ul className="mt-2 list-disc space-y-2 pl-5 text-sm text-emerald-700">
                 <li>Make the title clear and specific.</li>
                 <li>Give enough context so people can reply meaningfully.</li>
-                <li>Use relevant tags so the right people discover it.</li>
+                <li>Format any code snippets properly.</li>
               </ul>
             </div>
 
             <div className="flex flex-col gap-3 sm:flex-row">
               <button
                 type="submit"
-                className="w-full rounded-full bg-emerald-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-500"
+                disabled={loading}
+                className="w-full rounded-full bg-emerald-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:opacity-50"
               >
-                {isDraft ? 'Save draft' : 'Publish topic'}
+                {loading ? 'Publishing...' : 'Publish topic'}
               </button>
             </div>
           </div>

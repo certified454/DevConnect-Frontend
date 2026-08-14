@@ -10,7 +10,7 @@ function VerifyContent() {
   const initialEmail = searchParams?.get('email') ?? '';
 
   const [email, setEmail] = useState(initialEmail);
-  const [code, setCode] = useState('');
+  const [otp, setOtp] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isResending, setIsResending] = useState(false);
   const [secondsLeft, setSecondsLeft] = useState(60);
@@ -54,7 +54,7 @@ function VerifyContent() {
   const handleVerify = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!email.trim() || !code.trim()) {
+    if (!email.trim() || !otp.trim()) {
       showToast('Missing info', 'Please enter your email and verification code.', 'error');
       return;
     }
@@ -65,7 +65,7 @@ function VerifyContent() {
       const res = await fetch(verifyUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.trim(), code: code.trim() }),
+        body: JSON.stringify({ email: email.trim(), otp: otp.trim() }),
       });
 
       const data = await res.json().catch(() => null);
@@ -168,8 +168,8 @@ function VerifyContent() {
               <input
                 id="verification-code"
                 type="text"
-                value={code}
-                onChange={(e) => setCode(e.target.value)}
+                value={otp}
+                onChange={(e) => setOtp(e.target.value)}
                 placeholder="Enter code here"
                 className="w-full border-0 bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400"
               />

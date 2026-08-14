@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, type MouseEvent } from 'react';
+import { useEffect, useState, useRef, useMemo, type MouseEvent } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import NaijaStates from 'naija-state-local-government';
 import { Box } from '@/components/ui/box';
@@ -47,6 +47,40 @@ import {
 import { Pressable } from 'react-native';
 import { Button, ButtonText } from '@/components/ui/button';
 
+interface User {
+  id: string;
+  username: string;
+  profilePic: string;
+  country: string;
+}
+
+interface Comment {
+  id: string;
+  name: string;
+  text: string;
+}
+
+interface Post {
+  id: string;
+  user: {
+    username: string;
+    profilePic: string;
+  };
+  avatar: string;
+  state: string;
+  country: string;
+  title: string;
+  content: string;
+  codeSnippet?: string;
+  imageUrl?: string;
+  likes: string[];
+  comments: Comment[];
+  replyCount: number;
+  views: number;
+  tags?: string[];
+  createdAt: string;
+}
+
 function HouseIcon({ className = 'h-5 w-5' }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" fill="currentColor" className={className}>
@@ -79,73 +113,29 @@ function SparkIcon({ className = 'h-5 w-5' }: { className?: string }) {
   );
 }
 
-const nigerianStates = NaijaStates.states();
 const HANGOUT_STORAGE_KEY = 'devconnect-joined-hangouts';
 const HANGOUT_ID = 'devconnect-hangout-1';
 
-const feedPosts = [
-  {
-    id: 'p1',
-    name: 'Sighter tech ltd',
-    state: 'Lagos',
-    avatar:
-      'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxzZWFyY2h8Mnx8dXNlcnxlbnwwfHwwfHw%3D&auto=format&fit=crop&w=800&q=60',
-    comments: 6,
-    views: 312,
-    replyCount: 2,
-    replies: [
-      { id: 'r1', name: 'techmania', text: 'Great point!' },
-      { id: 'r2', name: 'sanuxtech', text: 'We should optimize for offline too.' },
-    ],
-  },
-  {
-    id: 'p2',
-    name: 'Marry technologies',
-    state: 'Rivers',
-    avatar: 'https://th.bing.com/th/id/OIP.xjq0g6I85ja3eBJRD0kdKAHaHa?w=202&h=202&c=7&r=0&o=7&dpr=1.3&pid=1.7&rm=3',
-    comments: 2,
-    views: 148,
-    replyCount: 0,
-    replies: [],
-  },
-  {
-    id: 'p3',
-    name: 'SoulTech',
-    state: 'Oyo',
-    avatar: 'https://th.bing.com/th/id/OIP.fNM5cKvrKHTcZ_0dilaaXgHaNN?w=187&h=333&c=7&r=0&o=7&dpr=1.3&pid=1.7&rm=3',
-    comments: 1,
-    views: 96,
-    replyCount: 1,
-    replies: [{ id: 'r3', name: 'devChidi', text: 'Nice work' }],
-  },
-  {
-    id: 'p4',
-    name: 'Favour Emmanuel',
-    state: 'FCT - Abuja',
-    avatar: 'https://th.bing.com/th/id/OIP.fNM5cKvrKHTcZ_0dilaaXgHaNN?w=187&h=333&c=7&r=0&o=7&dpr=1.3&pid=1.7&rm=3',
-    comments: 0,
-    views: 40,
-    replyCount: 0,
-    replies: [],
-  },
-  {
-    id: 'p5',
-    name: 'Sanux tech',
-    state: 'Lagos',
-    avatar:
-      'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxzZWFyY2h8Mnx8dXNlcnxlbnwwfHwwfHw%3D&auto=format&fit=crop&w=800&q=60',
-    comments: 6,
-    views: 312,
-    replyCount: 0,
-    replies: [],
-  },
-];
+function timeAgo(dateString?: string) {
+  if (!dateString) return '';
+  const then = new Date(dateString).getTime();
+  if (isNaN(then)) return '';
+  const now = Date.now();
+  const seconds = Math.floor((now - then) / 1000);
 
-const tags = ["#today'stopic", '#Devwahala', '#dev', '#NgPower'];
+  if (seconds < 60) return `${seconds} seconds ago`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes} minutes ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} hours ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days} days ago`;
+  const months = Math.floor(days / 30);
+  if (months < 12) return `${months}months ago`;
+  const years = Math.floor(months / 12);
+  return `${years}years ago`;
+}
 
-/**
- * Detailed SportyBet-style dark footer card component.
- */
 function SiteFooter({ className = '' }: { className?: string }) {
   return (
     <Box className={`bg-slate-900 border border-slate-800 p-4 rounded-2xl text-slate-300 ${className}`}>
@@ -200,21 +190,293 @@ function SiteFooter({ className = '' }: { className?: string }) {
 
 export default function Home() {
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [selectedState, setSelectedState] = useState('all');
+  const [selectedCountry, setSelectedCountry] = useState('all');
   const [openPopover, setOpenPopover] = useState<string | null>(null);
   const [activeReplies, setActiveReplies] = useState<string | null>(null);
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [showScrollTop, setShowScrollTop] = useState(false);
   const [joinedHangouts, setJoinedHangouts] = useState<string[]>([]);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [feedPosts, setFeedPosts] = useState<Post[]>([]);
+  const [refreshCounter, setRefreshCounter] = useState(0);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [pullDistance, setPullDistance] = useState(0);
+  const feedRef = useRef<HTMLDivElement | null>(null);
+  
+  const countryOptions = useMemo(() => {
+  const s = new Set<string>();
+  feedPosts.forEach((p) => s.add(p.country ?? (p.state ?? 'Global')));
+  return Array.from(s).sort();
+  }, [feedPosts]);
+
+  const pullStartRef = useRef<number | null>(null);
+  const PULL_THRESHOLD = 60;
+
+  // persistent anonymous viewer id so anonymous views can be distinct across browsers
+  const viewerId = useMemo(() => {
+    try {
+      if (typeof window === 'undefined') return 'anon';
+      const stored = window.localStorage.getItem('devconnect-viewer-id');
+      if (stored) return stored;
+      const id = `anon-${Math.random().toString(36).slice(2, 10)}`;
+      window.localStorage.setItem('devconnect-viewer-id', id);
+      return id;
+    } catch {
+      return 'anon';
+    }
+  }, []);
 
   const router = useRouter();
   const pathname = usePathname();
+  
+  // API URL targeting backend route
+  const apiBaseUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000').replace(/\/$/, '');
+  const userURL = `${apiBaseUrl}/api/auth/current-user`;
+  const feedPostsURL = `${apiBaseUrl}/api/posts`;
 
   const toggleTheme = () => setTheme((prev) => (prev === 'light' ? 'dark' : 'light'));
 
+  // fetch current authenticated user
   useEffect(() => {
-    const savedTheme = window.localStorage.getItem('theme');
-    if (savedTheme === 'dark' || savedTheme === 'light') {
+    const fetchCurrentUser = async () => {
+      try {
+        if (typeof window === 'undefined') return;
+
+        const token = localStorage.getItem('authToken') || sessionStorage.getItem('authToken');
+        if (!token) return;
+
+        const res = await fetch(userURL, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (!res.ok) {
+          console.warn('current-user fetch failed status:', res.status);
+          return;
+        }
+
+        const data = await res.json().catch(() => null);
+        const user = data?.user ?? data;
+
+        if (user) {
+          setCurrentUser(user);
+        }
+      } catch (err) {
+        console.error('Fetch current user error:', err);
+      }
+    };
+
+    fetchCurrentUser();
+  }, [userURL]);
+
+  // fetch feed posts
+  useEffect(() => {
+    const fetchFeedPosts = async () => {
+      try {
+        if (typeof window === 'undefined') return;
+
+        if (refreshCounter > 0) setIsRefreshing(true);
+
+        const token = localStorage.getItem('authToken') || sessionStorage.getItem('authToken');
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+        if (token) headers.Authorization = `Bearer ${token}`;
+
+        // Feed is public; include auth header only when available
+        const res = await fetch(feedPostsURL, {
+          method: 'GET',
+          headers,
+        });
+
+        if (!res.ok) {
+          console.warn('feed-posts fetch failed status:', res.status);
+          return;
+        }
+
+        const data = await res.json().catch(() => null);
+        if (!data) {
+          console.debug('Feed fetch returned empty body');
+        } else {
+          console.debug('Feed fetch response shape:', data);
+        }
+
+        // Support multiple backend shapes: array, { posts: [] }, { data: { posts: [] } }
+        const rawPosts = Array.isArray(data)
+          ? data
+          : data?.posts ?? data?.data?.posts ?? data?.data ?? [];
+
+        // Normalize Backend Data -> Frontend Data
+        const normalizedPosts: Post[] = rawPosts.map((p: any) => ({
+          id: p._id,
+          user: {
+            username: p.user?.username ?? 'Anonymous',
+            profilePic: p.user?.profilePic ?? '/icon/logo.png',
+          },
+          avatar: p.user?.profilePic ?? '/icon/logo.png',
+          // Prefer server-provided post.state; fall back to user.country (object or string)
+          state: p.state ?? (p.user?.country?.name ?? p.user?.country ?? 'Global'),
+          // Explicit country for filtering
+          country: p.country ?? (p.user?.country?.name ?? p.user?.country ?? 'Global'),
+          title: p.title ?? '',
+          content: p.content ?? '',
+          codeSnippet: p.codeSnippet ?? '',
+          imageUrl: p.imageUrl ?? '',
+          likes: p.likes ?? [],
+          comments: (p.comments || []).map((c: any) => ({
+            id: c._id,
+            name: c.user?.username ?? 'Anonymous',
+            text: c.text,
+          })),
+          replyCount: p.comments ? p.comments.length : 0,
+          views: p.views ?? 0,
+          createdAt: p.createdAt,
+          tags: p.tags ?? [],
+        }));
+
+        setFeedPosts(normalizedPosts);
+      } catch (err) {
+        console.error('Fetch feed posts error:', err);
+      } finally {
+        if (refreshCounter > 0) setIsRefreshing(false);
+      }
+    };
+
+    fetchFeedPosts();
+  }, [feedPostsURL, refreshCounter]);
+
+  // Pull-to-refresh handlers
+  useEffect(() => {
+    const el = feedRef.current;
+    if (!el) return;
+
+    const onTouchStart = (e: TouchEvent) => {
+      if (el.scrollTop > 0) return;
+      pullStartRef.current = e.touches[0].clientY;
+    };
+
+    const onTouchMove = (e: TouchEvent) => {
+      if (pullStartRef.current === null) return;
+      const dy = e.touches[0].clientY - (pullStartRef.current || 0);
+      if (dy > 0) {
+        e.preventDefault();
+        setPullDistance(Math.min(dy / 1.5, 150));
+      }
+    };
+
+    const onTouchEnd = () => {
+      if (pullStartRef.current === null) return;
+      if (pullDistance > PULL_THRESHOLD) {
+        setIsRefreshing(true);
+        setRefreshCounter((c) => c + 1);
+      }
+      setPullDistance(0);
+      pullStartRef.current = null;
+    };
+
+    const onMouseDown = (e: MouseEvent) => {
+      // only when at top
+      if ((el as HTMLElement).scrollTop > 0) return;
+      pullStartRef.current = (e as any).clientY;
+      window.addEventListener('mousemove', onMouseMove as any, { passive: false });
+      window.addEventListener('mouseup', onMouseUp as any);
+    };
+
+    const onMouseMove = (e: MouseEvent) => {
+      if (pullStartRef.current === null) return;
+      const dy = (e as any).clientY - (pullStartRef.current || 0);
+      if (dy > 0) {
+        e.preventDefault();
+        setPullDistance(Math.min(dy / 1.5, 150));
+      }
+    };
+
+    const onMouseUp = () => {
+      if (pullStartRef.current === null) return;
+      if (pullDistance > PULL_THRESHOLD) {
+        setIsRefreshing(true);
+        setRefreshCounter((c) => c + 1);
+      }
+      setPullDistance(0);
+      pullStartRef.current = null;
+      window.removeEventListener('mousemove', onMouseMove as any);
+      window.removeEventListener('mouseup', onMouseUp as any);
+    };
+
+    el.addEventListener('touchstart', onTouchStart, { passive: true });
+    el.addEventListener('touchmove', onTouchMove, { passive: false });
+    el.addEventListener('touchend', onTouchEnd);
+    el.addEventListener('mousedown', onMouseDown as any);
+
+    return () => {
+      el.removeEventListener('touchstart', onTouchStart as any);
+      el.removeEventListener('touchmove', onTouchMove as any);
+      el.removeEventListener('touchend', onTouchEnd as any);
+      el.removeEventListener('mousedown', onMouseDown as any);
+      window.removeEventListener('mousemove', onMouseMove as any);
+      window.removeEventListener('mouseup', onMouseUp as any);
+    };
+  }, [pullDistance]);
+
+  // Observe posts entering viewport to count views (once per session)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const activeViewer = currentUser?.id ?? viewerId ?? 'anon';
+    const viewedKey = `devconnect-viewed-posts-${activeViewer}`;
+    const viewedRaw = sessionStorage.getItem(viewedKey);
+    const viewed = new Set<string>(viewedRaw ? JSON.parse(viewedRaw) : []);
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach(async (entry) => {
+          if (!entry.isIntersecting) return;
+          const el = entry.target as HTMLElement;
+          const postId = el.dataset.postId;
+          if (!postId) return;
+          if (viewed.has(postId)) return;
+
+          // mark as viewed in this session
+          viewed.add(postId);
+          try {
+            sessionStorage.setItem(viewedKey, JSON.stringify(Array.from(viewed)));
+          } catch {}
+
+          // call backend to increment view count
+          try {
+            const token = localStorage.getItem('authToken') || sessionStorage.getItem('authToken');
+            const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+            if (token) headers.Authorization = `Bearer ${token}`;
+            const res = await fetch(`${apiBaseUrl}/api/posts/${postId}/view`, {
+              method: 'PUT',
+              headers,
+            });
+            if (res.ok) {
+              const body = await res.json().catch(() => null);
+              const serverViews = body?.views ?? null;
+              setFeedPosts((prev) => prev.map((p) => (p.id === postId ? { ...p, views: serverViews ?? ((p.views ?? 0) + 1) } : p)));
+            }
+          } catch (err) {
+            console.error('Increment view error:', err);
+          }
+        });
+      },
+      { threshold: 0.6 },
+    );
+
+    // observe current post elements
+    feedPosts.forEach((p) => {
+      const el = document.querySelector(`[data-post-id=\"${p.id}\"]`);
+      if (el) observer.observe(el);
+    });
+
+    return () => observer.disconnect();
+  }, [feedPosts, apiBaseUrl, currentUser?.id]);
+
+  useEffect(() => {
+    const savedTheme = window.localStorage.getItem('theme') as 'light' | 'dark' | null;
+    if (savedTheme) {
       setTheme(savedTheme);
     }
   }, []);
@@ -284,9 +546,9 @@ export default function Home() {
   const closeReplies = () => setActiveReplies(null);
 
   const visiblePosts =
-    selectedState === 'all'
+    selectedCountry === 'all'
       ? feedPosts
-      : feedPosts.filter((post) => post.state === selectedState);
+      : feedPosts.filter((post) => post.country === selectedCountry);
 
   return (
     <Box className="min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
@@ -319,15 +581,15 @@ export default function Home() {
             <Box className="px-4 py-3 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md md:rounded-2xl md:bg-white md:dark:bg-slate-900 md:border md:border-slate-200/70 dark:border-slate-800 md:px-6 md:py-3.5 md:mb-3">
               <Box className="flex-row items-center gap-3">
                 <Box className="flex-row items-center gap-2">
-                  <Icon as={GlobeIcon} className="h-4 w-4 text-emerald-600" />
+                 
                   <Text className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">
-                    Filter by state:
+                    Filter posts
                   </Text>
                 </Box>
 
                 <Select
-                  selectedValue={selectedState}
-                  onValueChange={(value: any) => setSelectedState(value)}
+                  selectedValue={selectedCountry}
+                  onValueChange={(value: any) => setSelectedCountry(value)}
                 >
                   <SelectTrigger
                     variant="outline"
@@ -335,8 +597,8 @@ export default function Home() {
                     className="w-44 rounded-full border-slate-200 bg-white text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 px-4 py-1.5 data-[focus=true]:border-emerald-400 data-[focus=true]:ring-2 data-[focus=true]:ring-emerald-100"
                   >
                     <SelectInput
-                      placeholder="All States"
-                      value={selectedState === 'all' ? 'All States' : selectedState}
+                      placeholder="All Countries"
+                      value={selectedCountry === 'all' ? 'All Countries' : selectedCountry}
                       className="text-sm font-medium text-slate-700 dark:text-slate-200"
                     />
                     <SelectIcon className="mr-3" as={ChevronDownIcon} />
@@ -349,16 +611,16 @@ export default function Home() {
                       </SelectDragIndicatorWrapper>
 
                       <SelectItem
-                        label="All States"
+                        label="All Countries"
                         value="all"
                         className="mx-1 mb-1 rounded-lg border-b border-slate-100 px-3 py-2.5 text-sm font-medium text-slate-700 dark:text-slate-200 data-[highlighted=true]:bg-emerald-50 data-[highlighted=true]:text-emerald-700"
                       />
 
-                      {nigerianStates.map((state) => (
+                      {countryOptions.map((c) => (
                         <SelectItem
-                          key={state}
-                          label={state}
-                          value={state}
+                          key={c}
+                          label={c}
+                          value={c}
                           className="mx-1 rounded-lg px-3 py-2.5 text-sm text-slate-600 dark:text-slate-300 data-[highlighted=true]:bg-emerald-50 data-[highlighted=true]:text-emerald-700"
                         />
                       ))}
@@ -406,21 +668,47 @@ export default function Home() {
 
           {/* Grid/Flex Layout for Feed & Sidebar */}
           <Box className="flex flex-col gap-4 md:min-h-0 md:flex-1 md:flex-row md:gap-6">
-            {/* Infinite Feed Column */}
-            <VStack className="order-2 w-full gap-4 md:order-1 md:h-full md:w-[63%] md:min-h-0 md:overflow-y-auto md:pr-2 md:pb-6 scrollbar-hide">
-              {visiblePosts.map((post) => (
-                <Card
-                  key={post.id}
-                  className="w-full shadow shadow-slate-200 rounded-2xl bg-white border border-slate-100 p-5 dark:shadow-slate-950/40 dark:bg-slate-900 dark:border-slate-800"
-                >
+            {/* Infinite Feed Column with pull-to-refresh wrapper */}
+            <div
+              ref={feedRef}
+              className="order-2 w-full md:order-1 md:h-full md:w-[63%] md:min-h-0 md:overflow-y-auto md:pr-2 md:pb-6 scrollbar-hide"
+              style={{ WebkitOverflowScrolling: 'touch' }}
+            >
+              <div style={{ transform: `translateY(${pullDistance}px)`, transition: isRefreshing ? 'transform 200ms' : undefined }}>
+                <div className="flex items-center justify-center h-10">
+                  {pullDistance > 0 && !isRefreshing && (
+                    <span className="text-sm text-slate-500">{pullDistance > PULL_THRESHOLD ? 'Release to refresh' : 'Pull to refresh'}</span>
+                  )}
+                  {isRefreshing && (
+                    <span className="text-sm text-slate-500">Refreshing...</span>
+                  )}
+                </div>
+                <VStack className="w-full gap-4">
+                  {visiblePosts.map((post) => (
+                    <Card
+                      key={post.id}
+                      data-post-id={post.id}
+                      className="w-full shadow shadow-slate-200 rounded-2xl bg-white border border-slate-100 p-5 dark:shadow-slate-950/40 dark:bg-slate-900 dark:border-slate-800"
+                    >
                   <Box className="flex-row items-center justify-between">
                     <Box className="flex-row items-center gap-3">
                       <Avatar>
-                        <AvatarImage source={{ uri: post.avatar }} />
+                        <AvatarImage
+                          source={{
+                            uri:
+                              post.user?.profilePic ??
+                              post.avatar ??
+                              '/icon/logo.png',
+                          }}
+                        />
                       </Avatar>
                       <Box>
-                        <Text className="font-semibold">{post.name}</Text>
-                        <Text className="text-sm text-gray-500 dark:text-slate-400">3 hr ago · {post.state}</Text>
+                        <Text className="font-semibold">
+                          {post.user?.username ?? 'Unknown'}
+                        </Text>
+                            <Text className="text-sm text-gray-500 dark:text-slate-400">
+                              {post.createdAt ? `${timeAgo(post.createdAt)} · ${post.country ?? post.state ?? ''}` : post.country ?? post.state ?? ''}
+                            </Text>
                       </Box>
                     </Box>
                     <Popover
@@ -451,19 +739,14 @@ export default function Home() {
                   </Box>
 
                   <Text className="text-xl md:text-2xl font-bold text-slate-900 dark:text-slate-100 mt-3 mb-2">
-                    Internet Service Providers and Local Devs
+                    {post.title}
                   </Text>
                   <Text className="text-xs text-slate-600 dark:text-slate-400 md:text-sm leading-relaxed">
-                    Nigerian developers are out here building world-class fintechs, SaaS platforms, and mobile
-                    apps—while waging a daily war against latency, packet loss, and data costs. From switching
-                    between 4G/5G mobile networks, fiber providers, and Starlink to optimizing apps for slow
-                    connections, local devs are masters of resilience. Good ISP infrastructure isn&apos;t just
-                    about fast downloads; it&apos;s the engine powering Nigeria&apos;s tech economy. Respect to
-                    every dev shipping clean code through tough network conditions! 🚀
+                    {post.content}
                   </Text>
 
                   <Box className="mt-4 flex-row flex-wrap gap-2">
-                    {tags.map((tag) => (
+                    {(((post as any).tags) || []).map((tag: string) => (
                       <Card
                         key={tag}
                         className="bg-emerald-50 text-emerald-700 items-center justify-center rounded-full px-3 py-1 border border-emerald-100 shadow-none dark:bg-emerald-900/20 dark:text-emerald-300 dark:border-emerald-800"
@@ -490,15 +773,17 @@ export default function Home() {
                       <Text className="text-xs font-medium text-slate-500">{post.views}</Text>
                     </Box>
                   </Box>
-                </Card>
-              ))}
+                    </Card>
+                  ))}
 
               {visiblePosts.length === 0 && (
                 <Card className="w-full rounded-2xl bg-white p-6 border border-slate-100 shadow-sm">
-                  <Text className="text-slate-500 dark:text-slate-400">No posts found for {selectedState}.</Text>
+                  <Text className="text-slate-500 dark:text-slate-400">No posts found for {selectedCountry}.</Text>
                 </Card>
               )}
-            </VStack>
+                </VStack>
+              </div>
+            </div>
 
             {/* Right Sidebar (Upcoming Hangout & Desktop Footer) */}
             <Box className="order-1 w-full flex flex-col gap-4 md:order-2 md:h-full md:w-[35%] md:overflow-y-auto scrollbar-hide">
@@ -605,22 +890,31 @@ export default function Home() {
           </Box>
 
           {/* User Profile Card */}
-          <Box className="mb-6 rounded-xl border border-slate-800 bg-slate-800/60 p-4">
-            <a className="flex items-center gap-3 rounded-lg py-2 text-sm font-medium text-slate-300">
-              <Avatar className="h-8 w-8">
-                <AvatarImage
-                  source={{
-                    uri: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxzZWFyY2h8Mnx8dXNlcnxlbnwwfHwwfHw%3D&auto=format&fit=crop&w=800&q=60',
-                  }}
-                />
-              </Avatar>
-              <Text className="text-slate-100 text-sm font-semibold">Sighter Tech</Text>
-            </a>
-            <Pressable onPress={handleCreateTopic} className="mt-3 flex items-center justify-center rounded-xl bg-emerald-600 px-4 py-2.5 text-center text-xs font-bold text-white transition hover:bg-emerald-700">
-              <Text className="text-sm font-semibold text-white">Create Topic</Text>
-            </Pressable>
-          </Box>
+          {currentUser && (
+            <Box className="mb-6 rounded-xl border border-slate-800 bg-slate-800/60 p-4">
+              <a className="flex items-center gap-3 rounded-lg py-2 text-sm font-medium text-slate-300">
+                <Avatar className="h-10 w-10">
+                  <AvatarImage
+                    source={{
+                      uri:
+                        currentUser.profilePic ??
+                        'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=60',
+                    }}
+                  />
+                </Avatar>
+                <Text className="text-sm font-semibold text-slate-100">
+                  {currentUser.username}
+                </Text>
+              </a>
 
+              <Pressable
+                onPress={handleCreateTopic}
+                className="mt-3 flex items-center justify-center rounded-xl bg-emerald-600 px-4 py-2.5 text-center transition hover:bg-emerald-700"
+              >
+                <Text className="text-sm font-semibold text-white">Create Topic</Text>
+              </Pressable>
+            </Box>
+          )}
           {/* Mobile Footer Inside Drawer */}
           <Box className="mt-auto pt-4 border-t border-slate-800 md:hidden">
             <SiteFooter className="border-0 bg-transparent p-0" />
@@ -649,15 +943,15 @@ export default function Home() {
               <div className="absolute inset-0 bg-slate-900/50" onClick={closeReplies} />
               <div className="relative z-10 w-full max-w-lg rounded-t-2xl bg-white p-4 shadow-xl dark:bg-slate-900 md:rounded-2xl md:p-6">
                 <div className="flex items-center justify-between">
-                  <Text className="font-semibold">Replies</Text>
+                  <Text className="font-semibold">Comments</Text>
                   <button type="button" onClick={closeReplies} className="text-sm text-slate-500">Close</button>
                 </div>
 
                 <div className="mt-3 max-h-64 overflow-y-auto">
-                  {post.replies.length === 0 ? (
-                    <Text className="text-sm text-slate-500">No replies yet.</Text>
+                  {post.comments.length === 0 ? (
+                    <Text className="text-sm text-slate-500">No comments yet.</Text>
                   ) : (
-                    post.replies.map((r) => (
+                    post.comments.map((r) => (
                       <Box key={r.id} className="mb-3">
                         <Text className="font-semibold">{r.name}</Text>
                         <Text className="text-sm text-slate-600 dark:text-slate-300">{r.text}</Text>
