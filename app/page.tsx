@@ -179,7 +179,7 @@ function SiteFooter({ className = '' }: { className?: string }) {
       </Box>
       <Box className="border-t border-slate-800/80 pt-3 flex flex-col gap-1">
         <Text className="text-[10px] text-slate-400 leading-tight">Global premier tech hub for developers, creators, and innovators.</Text>
-        <Text className="text-[9px] text-slate-500 mt-1">© {new Date().getFullYear()} DevConnect Tech Ltd. All rights reserved.</Text>
+        <Text className="text-[9px] text-slate-500 mt-1">© {new Date().getFullYear()} DevConnect. All rights reserved.</Text>
       </Box>
     </Box>
   );
