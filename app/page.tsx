@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useRef, useMemo, type MouseEvent } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import NaijaStates from 'naija-state-local-government';
 import { Box } from '@/components/ui/box';
 import { Text } from '@/components/ui/text';
 import {
@@ -75,13 +74,10 @@ interface Post {
   state?: string;
 }
 
-// ── Constants ─────────────────────────────────────────────────────────────────
 
 const HANGOUT_STORAGE_KEY = 'devconnect-joined-hangouts';
 const HANGOUT_ID = 'devconnect-hangout-1';
-const FALLBACK_AVATAR = 'https://via.placeholder.com/150';
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
+const FALLBACK_AVATAR = 'https://th.bing.com/th/id/OIP.AhjRvsXgcvfCcr8Zj07lcgHaE7?w=280&h=187&c=7&r=0&o=7&dpr=1.3&pid=1.7&rm=3';
 
 function getApiBase() {
   return (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:5000').replace(/\/$/, '');
@@ -130,8 +126,6 @@ function getCountryName(c: any): string {
   return c.name ?? 'Global';
 }
 
-// ── Icons ─────────────────────────────────────────────────────────────────────
-
 function HouseIcon({ className = 'h-5 w-5' }: { className?: string }) {
   return <svg viewBox="0 0 24 24" fill="currentColor" className={className}><path d="M12.53 3.3a1 1 0 0 0-1.06 0l-8 5.95A1 1 0 0 0 3 9.95V20a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1v-4h6v4a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1V9.95a1 1 0 0 0-.47-.9l-8-5.95Z" /></svg>;
 }
@@ -158,8 +152,6 @@ function ReplyIcon({ className = 'h-4 w-4' }: { className?: string }) {
     </svg>
   );
 }
-
-// ── Footer ────────────────────────────────────────────────────────────────────
 
 function SiteFooter({ className = '' }: { className?: string }) {
   return (
@@ -192,8 +184,6 @@ function SiteFooter({ className = '' }: { className?: string }) {
     </Box>
   );
 }
-
-// ── Comment Thread ─────────────────────────────────────────────────────────────
 
 function CommentThread({
   comment,
@@ -322,8 +312,6 @@ function CommentThread({
     </Box>
   );
 }
-
-// ── Main Component ────────────────────────────────────────────────────────────
 
 export default function Home() {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -750,7 +738,7 @@ export default function Home() {
                 </Box>
                 <Box className="flex-row items-center gap-3 mt-3 md:justify-center">
                   <Avatar className="h-10 w-10 md:h-12 md:w-12 border border-slate-700">
-                    <AvatarImage source={{ uri: FALLBACK_AVATAR }} />
+                    <AvatarImage source={{ uri: FALLBACK_AVATAR }}/>
                   </Avatar>
                   <Box className="min-w-0 flex-1 gap-0.5 md:flex-none md:text-center">
                     <Text className="text-[10px] text-slate-400 dark:text-slate-300 md:text-xs">Topic</Text>
