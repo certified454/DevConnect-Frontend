@@ -73,9 +73,9 @@ export default function TermsPage() {
       title: 'Developer Content',
       lead: 'Users may create and share content including posts, questions, answers, comments, code snippets, project information, images, videos, messages, live-stream content, and developer profiles.',
       paragraphs: [
-        'You retain ownership of content that you create and submit to DevConnect.',
-        'By submitting content to DevConnect, you grant DevConnect a non-exclusive, worldwide, royalty-free license to host, store, reproduce, display, transmit, and technically process that content as necessary to operate, maintain, and improve the Platform.',
-        'This license does not transfer ownership of your intellectual property to DevConnect.',
+        'You retain ownership of content that you create and submit to DevConnect. ',
+        'By submitting content to DevConnect, you grant DevConnect a non-exclusive, worldwide, royalty-free license to host, store, reproduce, display, transmit, and technically process that content as necessary to operate, maintain, and improve the Platform. ',
+        'This license does not transfer ownership of your intellectual property to DevConnect. ',
         'You are responsible for ensuring that you have the necessary rights and permissions for content you upload.',
       ],
     },
@@ -84,8 +84,8 @@ export default function TermsPage() {
       num: '6',
       title: 'Code and Open-Source Content',
       paragraphs: [
-        'DevConnect may allow users to share source code and other technical materials.',
-        'You remain responsible for the licenses and permissions associated with code you upload.',
+        'DevConnect may allow users to share source code and other technical materials. ',
+        'You remain responsible for the licenses and permissions associated with code you upload. ',
         'Users should not assume that code shared on DevConnect is free to copy, modify, redistribute, or use commercially unless the applicable license or creator’s permission allows it.',
       ],
     },
@@ -124,7 +124,7 @@ export default function TermsPage() {
       num: '9',
       title: 'User Safety and Reporting',
       paragraphs: [
-        'If you encounter content or behavior that violates these Terms, you may report it through the reporting mechanisms provided by DevConnect.',
+        'If you encounter content or behavior that violates these Terms, you may report it through the reporting mechanisms provided by DevConnect. ',
         'DevConnect may investigate reports and take appropriate action, including removing content, restricting features, suspending accounts, or terminating accounts.',
       ],
     },
@@ -133,7 +133,7 @@ export default function TermsPage() {
       num: '10',
       title: 'Intellectual Property',
       paragraphs: [
-        'The DevConnect name, logo, branding, software, interface, design, documentation, and other original Platform materials are owned by DevConnect or its licensors unless otherwise stated.',
+        'The DevConnect name, logo, branding, software, interface, design, documentation, and other original Platform materials are owned by DevConnect or its licensors unless otherwise stated. ',
         'You may not copy, modify, distribute, sell, or commercially exploit DevConnect’s proprietary materials without appropriate authorization.',
       ],
     },
@@ -142,8 +142,8 @@ export default function TermsPage() {
       num: '11',
       title: 'Third-Party Services',
       paragraphs: [
-        'DevConnect may integrate with third-party services such as authentication providers, cloud storage providers, payment providers, analytics services, communication services, or other external platforms.',
-        'Your use of those services may be subject to their own terms and privacy policies.',
+        'DevConnect may integrate with third-party services such as authentication providers, cloud storage providers, payment providers, analytics services, communication services, or other external platforms. ',
+        'Your use of those services may be subject to their own terms and privacy policies. ',
         'DevConnect is not responsible for the independent practices or availability of third-party services.',
       ],
     },
@@ -166,7 +166,7 @@ export default function TermsPage() {
       num: '13',
       title: 'Security',
       paragraphs: [
-        'We take reasonable measures to protect the Platform and user information.',
+        'We take reasonable measures to protect the Platform and user information. ',
         'However, no internet service can guarantee absolute security. You acknowledge that using an online platform involves certain security risks.',
       ],
     },
@@ -189,8 +189,8 @@ export default function TermsPage() {
       num: '15',
       title: 'Disclaimer',
       paragraphs: [
-        'DevConnect is provided on an “as is” and “as available” basis to the extent permitted by law.',
-        'We do not guarantee that information shared by users is accurate, complete, reliable, or suitable for your particular situation.',
+        'DevConnect is provided on an “as is” and “as available” basis to the extent permitted by law. ',
+        'We do not guarantee that information shared by users is accurate, complete, reliable, or suitable for your particular situation. ',
         'Technical advice, code, recommendations, and other user-generated information should be independently reviewed before being used in production systems.',
       ],
     },
@@ -199,7 +199,7 @@ export default function TermsPage() {
       num: '16',
       title: 'Limitation of Liability',
       paragraphs: [
-        'To the maximum extent permitted by applicable law, DevConnect and its developers, operators, contributors, and service providers will not be responsible for indirect, incidental, special, consequential, or punitive damages arising from your use of the Platform.',
+        'To the maximum extent permitted by applicable law, DevConnect and its developers, operators, contributors, and service providers will not be responsible for indirect, incidental, special, consequential, or punitive damages arising from your use of the Platform. ',
         'Nothing in these Terms excludes liability that cannot legally be excluded under applicable law.',
       ],
     },
@@ -208,9 +208,9 @@ export default function TermsPage() {
       num: '17',
       title: 'Changes to These Terms',
       paragraphs: [
-        'We may update these Terms as DevConnect evolves.',
-        'When significant changes are made, we may provide notice through the Platform or other appropriate means.',
-        'Your continued use of DevConnect after the updated Terms become effective constitutes acceptance of the revised Terms.',
+        'We may update these Terms as DevConnect evolves. ',
+        'When significant changes are made, we may provide notice through the Platform or other appropriate means. ',
+        'Your continued use of DevConnect after the updated Terms become effective constitutes acceptance of the revised Terms. ',
       ],
     },
     {
@@ -218,7 +218,7 @@ export default function TermsPage() {
       num: '18',
       title: 'Governing Law',
       paragraphs: [
-        'These Terms will be interpreted according to applicable laws and regulations governing DevConnect and its users.',
+        'These Terms will be interpreted according to applicable laws and regulations governing DevConnect and its users. ',
         'Where required, disputes will be handled by the courts or dispute-resolution mechanisms having appropriate jurisdiction.',
       ],
     },

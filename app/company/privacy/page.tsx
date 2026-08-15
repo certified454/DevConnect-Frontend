@@ -86,8 +86,8 @@ export default function PrivacyPage() {
       num: '3',
       title: 'Public Profile Information',
       paragraphs: [
-        'Information you add to your developer profile may be visible to other members or the public.',
-        'Before publishing details on your profile, ensure you are comfortable making that information accessible to others.',
+        'Information you add to your developer profile may be visible to other members or the public. ',
+        'Before publishing details on your profile, ensure you are comfortable making that information accessible to others. ',
         'Do not publish sensitive personal data that you wish to keep private.',
       ],
     },
@@ -96,7 +96,7 @@ export default function PrivacyPage() {
       num: '4',
       title: 'Messages and Private Content',
       paragraphs: [
-        'DevConnect processes private messages and non-public communications strictly to deliver requested messaging features, ensure system security, prevent abuse, and satisfy legal obligations.',
+        'DevConnect processes private messages and non-public communications strictly to deliver requested messaging features, ensure system security, prevent abuse, and satisfy legal obligations. ',
         'Private communications are never treated as public profile content.',
       ],
     },
@@ -130,8 +130,8 @@ export default function PrivacyPage() {
       num: '7',
       title: 'Data Security',
       paragraphs: [
-        'We implement strict technical and organizational measures to safeguard your information against unauthorized access, loss, misuse, or alteration.',
-        'Protections include access controls, encryption, infrastructure monitoring, and authentication tokens.',
+        'We implement strict technical and organizational measures to safeguard your information against unauthorized access, loss, misuse, or alteration. ',
+        'Protections include access controls, encryption, infrastructure monitoring, and authentication tokens. ',
         'However, no web system can guarantee absolute security.',
       ],
     },
@@ -140,7 +140,7 @@ export default function PrivacyPage() {
       num: '8',
       title: 'Data Retention',
       paragraphs: [
-        'We retain information for as long as necessary to provide platform services, maintain your active account, comply with regulatory requirements, prevent abuse, and settle legal disputes.',
+        'We retain information for as long as necessary to provide platform services, maintain your active account, comply with regulatory requirements, prevent abuse, and settle legal disputes. ',
         'Retention timelines vary depending on the category of data.',
       ],
     },
@@ -162,7 +162,7 @@ export default function PrivacyPage() {
       num: '10',
       title: 'Account Deletion',
       paragraphs: [
-        'You can request account deletion directly via account settings or by contacting our team.',
+        'You can request account deletion directly via account settings or by contacting our team. ',
         'Upon account termination, certain data may be retained for legitimate legal compliance, audit, or fraud prevention requirements.',
       ],
     },
@@ -171,7 +171,7 @@ export default function PrivacyPage() {
       num: '11',
       title: "Children's Privacy",
       paragraphs: [
-        'DevConnect is not intended for children in violation of applicable laws.',
+        'DevConnect is not intended for children in violation of applicable laws. ',
         'If you suspect a child has provided unauthorized personal information, please contact us for immediate investigation and removal.',
       ],
     },
