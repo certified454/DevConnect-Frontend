@@ -78,6 +78,7 @@ interface Post {
 const HANGOUT_STORAGE_KEY = 'devconnect-joined-hangouts';
 const HANGOUT_ID = 'devconnect-hangout-1';
 const FALLBACK_AVATAR = 'https://th.bing.com/th/id/OIP.AhjRvsXgcvfCcr8Zj07lcgHaE7?w=280&h=187&c=7&r=0&o=7&dpr=1.3&pid=1.7&rm=3';
+const PULL_THRESHOLD = 60;
 
 function getApiBase() {
   return (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:5000').replace(/\/$/, '');
@@ -331,7 +332,7 @@ export default function Home() {
   const [pullDistance, setPullDistance] = useState(0);
   const feedRef = useRef<HTMLDivElement | null>(null);
   const pullStartRef = useRef<number | null>(null);
-  const PULL_THRESHOLD = 60;
+  const viewedPostsRef = useRef<Set<string>>(new Set());
   const uid = getUserId(currentUser);
 
   const router = useRouter();
@@ -396,23 +397,60 @@ export default function Home() {
       .finally(() => { setPostsLoading(false); setIsRefreshing(false); });
   }, [refreshCounter]);
 
+  // ── Pull-to-refresh touch handlers ─────────────────────────────────────────
+  // On desktop, the feed <div> itself scrolls (md:overflow-y-auto), so we can
+  // read el.scrollTop to know if we're at the top of the feed.
+  // On mobile, that class doesn't apply — the WINDOW scrolls instead, so the
+  // div's scrollTop is always 0. Reading el.scrollTop there was wrongly
+  // treating every touch as "at the top", causing e.preventDefault() to fire
+  // on every downward drag (i.e. every attempt to scroll back up the page),
+  // which blocked native scrolling on mobile. We now check the page's real
+  // scroll position on mobile instead.
   useEffect(() => {
     const el = feedRef.current;
     if (!el) return;
+
+    const isDesktopScroll = () =>
+      typeof window !== 'undefined' && window.matchMedia('(min-width: 768px)').matches;
+
+    const atPageTop = () =>
+      (window.scrollY || document.documentElement.scrollTop) <= 0;
+
+    const isAtTop = () => (isDesktopScroll() ? el.scrollTop <= 0 : atPageTop());
+
     const onTouchStart = (e: TouchEvent) => {
-      if (el.scrollTop > 0) return;
+      if (!isAtTop()) {
+        pullStartRef.current = null;
+        return;
+      }
       pullStartRef.current = e.touches[0].clientY;
     };
+
     const onTouchMove = (e: TouchEvent) => {
       if (pullStartRef.current === null) return;
+
+      // Re-check: if the page/feed has scrolled away from the top since
+      // touchstart (e.g. the user is mid-scroll), bail out and let the
+      // browser handle normal scrolling instead of hijacking the gesture.
+      if (!isAtTop()) {
+        pullStartRef.current = null;
+        setPullDistance(0);
+        return;
+      }
+
       const dy = e.touches[0].clientY - pullStartRef.current;
-      if (dy > 0) { e.preventDefault(); setPullDistance(Math.min(dy / 1.5, 120)); }
+      if (dy > 0) {
+        e.preventDefault();
+        setPullDistance(Math.min(dy / 1.5, 120));
+      }
     };
+
     const onTouchEnd = () => {
       if (pullDistance > PULL_THRESHOLD) setRefreshCounter((c) => c + 1);
       setPullDistance(0);
       pullStartRef.current = null;
     };
+
     el.addEventListener('touchstart', onTouchStart, { passive: true });
     el.addEventListener('touchmove', onTouchMove, { passive: false });
     el.addEventListener('touchend', onTouchEnd);
@@ -422,6 +460,28 @@ export default function Home() {
       el.removeEventListener('touchend', onTouchEnd);
     };
   }, [pullDistance]);
+
+  // ── View tracking ────────────────────────────────────────────────────────
+  // Fires once per post per session, for guests and signed-in users alike
+  // (the /view route has no auth requirement). We only count a post as
+  // "viewed" once its card has actually scrolled into the viewport, via
+  // IntersectionObserver below — not just because it exists in the DOM.
+  const registerView = async (postId: string) => {
+    if (!postId || viewedPostsRef.current.has(postId)) return;
+    viewedPostsRef.current.add(postId);
+    try {
+      const res = await fetch(`${getApiBase()}/api/posts/${postId}/view`, { method: 'PUT' });
+      const data = await res.json();
+      if (data.success) {
+        setPosts((prev) => prev.map((p) =>
+          (p._id ?? p.id) === postId ? { ...p, views: data.views } : p
+        ));
+      }
+    } catch (err) {
+      console.error('incrementView error:', err);
+      viewedPostsRef.current.delete(postId); // allow retry on next scroll-into-view
+    }
+  };
 
   const handleToggleLike = async (postId: string) => {
     const token = getToken();
@@ -510,6 +570,30 @@ export default function Home() {
   const activePost = activePostId
     ? posts.find((p) => (p._id ?? p.id) === activePostId) ?? null
     : null;
+
+  // Observe post cards and count a view once a card is ~half visible in
+  // the viewport. Re-runs whenever the visible set of posts changes (e.g.
+  // after filtering by country, or a fresh fetch) so new cards get observed.
+  useEffect(() => {
+    if (typeof window === 'undefined' || !('IntersectionObserver' in window)) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            const postId = entry.target.getAttribute('data-post-id');
+            if (postId) registerView(postId);
+          }
+        });
+      },
+      { threshold: 0.5 }
+    );
+
+    const cards = document.querySelectorAll('[data-post-id]');
+    cards.forEach((card) => observer.observe(card));
+
+    return () => observer.disconnect();
+  }, [visiblePosts]);
 
   return (
     <Box className="min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
