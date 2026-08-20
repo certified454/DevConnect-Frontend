@@ -21,25 +21,42 @@ import { Avatar, AvatarImage } from '@/components/ui/avatar';
 import { Card } from '@/components/ui/card';
 import { VStack } from '@/components/ui/vstack';
 import {
-  Select, SelectTrigger, SelectInput, SelectIcon, SelectPortal,
-  SelectBackdrop, SelectContent, SelectDragIndicator,
-  SelectDragIndicatorWrapper, SelectItem,
+  Select,
+  SelectTrigger, 
+  SelectInput, 
+  SelectIcon, 
+  SelectPortal,
+  SelectBackdrop, 
+  SelectContent, 
+  SelectDragIndicator,
+  SelectDragIndicatorWrapper, 
+  SelectItem,
 } from '@/components/ui/select';
 import {
-  Popover, PopoverBackdrop, PopoverArrow, PopoverBody, PopoverContent,
+  Popover, 
+  PopoverBackdrop, 
+  PopoverArrow, 
+  PopoverBody, 
+  PopoverContent,
 } from '@/components/ui/popover';
 import { Pressable } from 'react-native';
 import { Button, ButtonText } from '@/components/ui/button';
-
-// ── Types ─────────────────────────────────────────────────────────────────────
 
 interface CurrentUser {
   _id: string;
   id?: string;
   username: string;
   profilePic?: string;
-  country?: { name: string; code: string; dialCode: string } | string;
+  country?: { 
+    name: string; 
+    code: string; 
+    dialCode: string 
+  } | string;
   isVerified?: boolean;
+  language?: string[];
+  languages?: string[];
+  framework?: string[];
+  frameworks?: string[];
 }
 
 interface Reply {
@@ -77,6 +94,7 @@ interface Post {
 
 const HANGOUT_STORAGE_KEY = 'devconnect-joined-hangouts';
 const HANGOUT_ID = 'devconnect-hangout-1';
+const PROFILE_REMINDER_DISMISS_KEY = 'devconnect-profile-reminder-dismissed';
 const FALLBACK_AVATAR = 'https://th.bing.com/th/id/OIP.AhjRvsXgcvfCcr8Zj07lcgHaE7?w=280&h=187&c=7&r=0&o=7&dpr=1.3&pid=1.7&rm=3';
 const PULL_THRESHOLD = 60;
 
@@ -121,6 +139,20 @@ function getUserId(u: CurrentUser | null): string {
   return u?._id ?? u?.id ?? '';
 }
 
+function getUserLanguages(u: CurrentUser | null): string[] {
+  if (!u) return [];
+  if (Array.isArray(u.languages)) return u.languages;
+  if (Array.isArray(u.language)) return u.language;
+  return [];
+}
+
+function getUserFrameworks(u: CurrentUser | null): string[] {
+  if (!u) return [];
+  if (Array.isArray(u.frameworks)) return u.frameworks;
+  if (Array.isArray(u.framework)) return u.framework;
+  return [];
+}
+
 function getCountryName(c: any): string {
   if (!c) return 'Global';
   if (typeof c === 'string') return c;
@@ -156,7 +188,7 @@ function ReplyIcon({ className = 'h-4 w-4' }: { className?: string }) {
 
 function SiteFooter({ className = '' }: { className?: string }) {
   return (
-    <Box className={`bg-slate-900 border border-slate-800 p-4 rounded-2xl text-slate-300 ${className}`}>
+    <Box className={`shrink-0 overflow-hidden bg-slate-900 border border-slate-800 p-4 rounded-2xl text-slate-300 ${className}`}>
       <Box className="flex-row items-center justify-between border-b border-slate-800 pb-3 mb-3">
         <Box className="flex-row items-center gap-2">
           <Text className="text-emerald-400 font-bold text-base">DevConnect</Text>
@@ -321,6 +353,8 @@ export default function Home() {
   const [activePostId, setActivePostId] = useState<string | null>(null);
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [showScrollTop, setShowScrollTop] = useState(false);
+  const [showProfileReminder, setShowProfileReminder] = useState(false);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [joinedHangouts, setJoinedHangouts] = useState<string[]>([]);
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
@@ -368,7 +402,6 @@ export default function Home() {
   // ── Hangout storage ────────────────────────────────────────────────────────
   useEffect(() => { setJoinedHangouts(getStoredJoinedHangouts()); }, []);
 
-  // ── Fetch current user ─────────────────────────────────────────────────────
   useEffect(() => {
     const token = getToken();
     if (!token) return;
@@ -376,7 +409,19 @@ export default function Home() {
       .then((r) => r.json())
       .then((data) => {
         const user = data?.user ?? (data?.username ? data : null);
-        if (user) setCurrentUser(user);
+        if (!user) return;
+        setCurrentUser(user);
+
+        const langs = getUserLanguages(user);
+        const fws = getUserFrameworks(user);
+        const profileIncomplete = langs.length === 0 || fws.length === 0;
+
+        if (profileIncomplete) {
+          const alreadyDismissed =
+            typeof window !== 'undefined' &&
+            window.sessionStorage.getItem(PROFILE_REMINDER_DISMISS_KEY) === '1';
+          if (!alreadyDismissed) setShowProfileReminder(true);
+        }
       })
       .catch((err) => console.error('getCurrentUser error:', err));
   }, []);
@@ -397,15 +442,6 @@ export default function Home() {
       .finally(() => { setPostsLoading(false); setIsRefreshing(false); });
   }, [refreshCounter]);
 
-  // ── Pull-to-refresh touch handlers ─────────────────────────────────────────
-  // On desktop, the feed <div> itself scrolls (md:overflow-y-auto), so we can
-  // read el.scrollTop to know if we're at the top of the feed.
-  // On mobile, that class doesn't apply — the WINDOW scrolls instead, so the
-  // div's scrollTop is always 0. Reading el.scrollTop there was wrongly
-  // treating every touch as "at the top", causing e.preventDefault() to fire
-  // on every downward drag (i.e. every attempt to scroll back up the page),
-  // which blocked native scrolling on mobile. We now check the page's real
-  // scroll position on mobile instead.
   useEffect(() => {
     const el = feedRef.current;
     if (!el) return;
@@ -429,9 +465,6 @@ export default function Home() {
     const onTouchMove = (e: TouchEvent) => {
       if (pullStartRef.current === null) return;
 
-      // Re-check: if the page/feed has scrolled away from the top since
-      // touchstart (e.g. the user is mid-scroll), bail out and let the
-      // browser handle normal scrolling instead of hijacking the gesture.
       if (!isAtTop()) {
         pullStartRef.current = null;
         setPullDistance(0);
@@ -461,11 +494,6 @@ export default function Home() {
     };
   }, [pullDistance]);
 
-  // ── View tracking ────────────────────────────────────────────────────────
-  // Fires once per post per session, for guests and signed-in users alike
-  // (the /view route has no auth requirement). We only count a post as
-  // "viewed" once its card has actually scrolled into the viewport, via
-  // IntersectionObserver below — not just because it exists in the DOM.
   const registerView = async (postId: string) => {
     if (!postId || viewedPostsRef.current.has(postId)) return;
     viewedPostsRef.current.add(postId);
@@ -552,6 +580,42 @@ export default function Home() {
   const handleSignIn = () => router.push('/auth/signin');
   const handleCreateTopic = () => router.push('/topic');
 
+  const handleLogout = async () => {
+    const token = getToken();
+    try {
+      if (token) {
+        await fetch(`${getApiBase()}/api/auth/logout`, {
+          method: 'POST',
+          headers: authHeaders(token),
+        });
+      }
+    } catch (err) {
+      console.error('logout error:', err);
+    } finally {
+      if (typeof window !== 'undefined') {
+        window.localStorage.removeItem('authToken');
+        window.localStorage.removeItem('token');
+        window.sessionStorage.removeItem('authToken');
+      }
+      setCurrentUser(null);
+      setMobileOpen(false);
+      dismissProfileReminder();
+      router.push('/');
+    }
+  };
+
+  const dismissProfileReminder = () => {
+    setShowProfileReminder(false);
+    if (typeof window !== 'undefined') {
+      window.sessionStorage.setItem(PROFILE_REMINDER_DISMISS_KEY, '1');
+    }
+  };
+
+  const goUpdateProfile = () => {
+    dismissProfileReminder();
+    router.push('/auth/updateaccount');
+  };
+
   const currentSection = pathname === '/hangout' ? 'hangout' : 'home';
   const navItems = [
     { label: 'Home', href: '/', icon: <HouseIcon />, active: currentSection === 'home' },
@@ -571,9 +635,9 @@ export default function Home() {
     ? posts.find((p) => (p._id ?? p.id) === activePostId) ?? null
     : null;
 
-  // Observe post cards and count a view once a card is ~half visible in
-  // the viewport. Re-runs whenever the visible set of posts changes (e.g.
-  // after filtering by country, or a fresh fetch) so new cards get observed.
+  const needsStackSetup = !!currentUser &&
+    (getUserLanguages(currentUser).length === 0 || getUserFrameworks(currentUser).length === 0);
+
   useEffect(() => {
     if (typeof window === 'undefined' || !('IntersectionObserver' in window)) return;
 
@@ -669,6 +733,35 @@ export default function Home() {
 
                   <Pressable onPress={handleSignIn} className="mt-1 w-32 items-center rounded-full bg-amber-600 px-3 py-1.5 shadow-sm transition duration-200 hover:bg-amber-700 md:mt-0 md:w-40 md:px-4 md:py-2">
                     <Text className="text-xs font-semibold text-white md:text-sm">Sign Up</Text>
+                  </Pressable>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Complete-your-profile banner — signed-in users missing languages/frameworks */}
+          {currentUser && needsStackSetup && (
+            <div className="stack-setup-card relative mt-3 mb-3 overflow-hidden rounded-2xl border border-emerald-100 p-3 shadow-sm shadow-emerald-100/70 md:mb-4 md:rounded-3xl md:p-6 bg-gradient-to-r from-emerald-50/60 to-amber-50/50 dark:from-slate-800/80 dark:to-slate-900/90">
+              <div className="relative flex flex-col gap-2 md:flex-row md:items-center md:justify-between md:gap-3">
+                <div className="flex flex-col gap-1">
+                  <Text className="text-[15px] tracking-[0.20em] md:text-xl md:tracking-[0.24em] font-bold uppercase text-emerald-600">
+                    Complete Your Profile
+                  </Text>
+                  <Text className="text-[13px] text-slate-900 dark:text-slate-100 md:text-sm">
+                    Add the languages and frameworks you work with so we can match you with the right people, hangouts, and discussions.
+                  </Text>
+                </div>
+
+                <div className="flex w-auto flex-col items-center justify-center gap-2 md:gap-3">
+                  <div className="stack-setup-badge flex items-center gap-1.5 rounded-full bg-white/80 dark:bg-slate-800/80 px-2.5 py-1.5 shadow-sm md:gap-2 md:px-3 md:py-2">
+                    <span className="stack-setup-dot h-2 w-2 rounded-full bg-emerald-500 md:h-2.5 md:w-2.5" />
+                    <Text className="text-sm font-medium text-slate-700 dark:text-slate-200 md:text-xs">
+                      It only takes a minute — unlock full access to DevConnect!
+                    </Text>
+                  </div>
+
+                  <Pressable onPress={() => router.push('/auth/updateaccount')} className="mt-1 w-40 items-center rounded-full bg-emerald-600 px-3 py-1.5 shadow-sm transition duration-200 hover:bg-emerald-700 md:mt-0 md:w-48 md:px-4 md:py-2">
+                    <Text className="text-xs font-semibold text-white md:text-sm">Update Profile</Text>
                   </Pressable>
                 </div>
               </div>
@@ -878,9 +971,14 @@ export default function Home() {
               </Box>
             </Box>
             {currentUser ? (
-              <Pressable onPress={handleCreateTopic} className="mt-3 flex items-center justify-center rounded-xl bg-emerald-600 px-4 py-2.5">
-                <Text className="text-sm font-semibold text-white">Create Topic</Text>
-              </Pressable>
+              <>
+                <Pressable onPress={handleCreateTopic} className="mt-3 flex items-center justify-center rounded-xl bg-emerald-600 px-4 py-2.5">
+                  <Text className="text-sm font-semibold text-white">Create Topic</Text>
+                </Pressable>
+                <Pressable onPress={() => setShowLogoutConfirm(true)} className="mt-2 flex items-center justify-center rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 dark:border-red-900/40 dark:bg-red-950/20">
+                  <Text className="text-sm font-semibold text-red-600 dark:text-red-400">Log out</Text>
+                </Pressable>
+              </>
             ) : (
               <Pressable onPress={handleSignIn} className="mt-3 flex items-center justify-center rounded-xl bg-amber-600 px-4 py-2.5">
                 <Text className="text-sm font-semibold text-white">Sign In</Text>
@@ -900,6 +998,97 @@ export default function Home() {
           <Icon as={ArrowUpIcon} className="h-5 w-5" />
         </button>
       ) : null}
+
+      {/* Profile-incomplete reminder popup */}
+      {showProfileReminder ? (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center px-4">
+          <div
+            className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm animate-[fadeIn_200ms_ease-out]"
+            onClick={dismissProfileReminder}
+          />
+          <div
+            className="relative z-10 w-full max-w-sm rounded-3xl border border-emerald-100 bg-white p-6 text-center shadow-2xl dark:border-slate-800 dark:bg-slate-900 animate-[popIn_250ms_ease-out]"
+          >
+            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-900/30">
+              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-500 text-white animate-pulse">
+                <SparkIcon className="h-4 w-4" />
+              </span>
+            </div>
+            <Text className="text-lg font-bold text-slate-900 dark:text-slate-100">
+              Finish setting up your stack
+            </Text>
+            <Text className="mt-2 text-sm text-slate-600 dark:text-slate-400">
+              You haven't added your languages and frameworks yet. Add them now to unlock full access — matching, hangouts, and more.
+            </Text>
+            <div className="mt-5 flex flex-col gap-2 sm:flex-row">
+              <button
+                type="button"
+                onClick={dismissProfileReminder}
+                className="flex-1 rounded-full border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+              >
+                Later
+              </button>
+              <button
+                type="button"
+                onClick={goUpdateProfile}
+                className="flex-1 rounded-full bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-500"
+              >
+                Update Profile
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {/* Logout confirmation popup */}
+      {showLogoutConfirm ? (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center px-4">
+          <div
+            className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm animate-[fadeIn_200ms_ease-out]"
+            onClick={() => setShowLogoutConfirm(false)}
+          />
+          <div className="relative z-10 w-full max-w-sm rounded-3xl border border-slate-200 bg-white p-6 text-center shadow-2xl dark:border-slate-800 dark:bg-slate-900 animate-[popIn_250ms_ease-out]">
+            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-red-100 dark:bg-red-900/30">
+              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-red-500 text-white">
+                <CloseIcon className="h-4 w-4" />
+              </span>
+            </div>
+            <Text className="text-lg font-bold text-slate-900 dark:text-slate-100">
+              Log out of DevConnect?
+            </Text>
+            <Text className="mt-2 text-sm text-slate-600 dark:text-slate-400">
+              You'll need to sign in again to like posts, comment, and join hangouts.
+            </Text>
+            <div className="mt-5 flex flex-col gap-2 sm:flex-row">
+              <button
+                type="button"
+                onClick={() => setShowLogoutConfirm(false)}
+                className="flex-1 rounded-full border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => { setShowLogoutConfirm(false); handleLogout(); }}
+                className="flex-1 rounded-full bg-red-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-red-500"
+              >
+                Log out
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      <style jsx global>{`
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        @keyframes popIn {
+          from { opacity: 0; transform: scale(0.92) translateY(8px); }
+          to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+      `}</style>
 
       {/* Comments & Replies Modal */}
       {activePost ? (
