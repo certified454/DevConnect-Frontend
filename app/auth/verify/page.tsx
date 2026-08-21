@@ -1,16 +1,16 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Toast, ToastDescription, ToastTitle, useToast } from '@/components/ui/toast';
 
-export default function VerifyPage() {
+function VerifyContent() {
   const searchParams = useSearchParams();
   const initialEmail = searchParams?.get('email') ?? '';
 
   const [email, setEmail] = useState(initialEmail);
-  const [code, setCode] = useState('');
+  const [otp, setOtp] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isResending, setIsResending] = useState(false);
   const [secondsLeft, setSecondsLeft] = useState(60);
@@ -51,8 +51,10 @@ export default function VerifyPage() {
     });
   };
 
-  const handleVerify = async () => {
-    if (!email.trim() || !code.trim()) {
+  const handleVerify = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!email.trim() || !otp.trim()) {
       showToast('Missing info', 'Please enter your email and verification code.', 'error');
       return;
     }
@@ -63,7 +65,7 @@ export default function VerifyPage() {
       const res = await fetch(verifyUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.trim(), code: code.trim() }),
+        body: JSON.stringify({ email: email.trim(), otp: otp.trim() }),
       });
 
       const data = await res.json().catch(() => null);
@@ -166,8 +168,8 @@ export default function VerifyPage() {
               <input
                 id="verification-code"
                 type="text"
-                value={code}
-                onChange={(e) => setCode(e.target.value)}
+                value={otp}
+                onChange={(e) => setOtp(e.target.value)}
                 placeholder="Enter code here"
                 className="w-full border-0 bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400"
               />
@@ -195,5 +197,17 @@ export default function VerifyPage() {
         </div>
       </div>
     </main>
+  );
+}
+
+export default function VerifyPage() {
+  return (
+    <Suspense fallback={
+      <main className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-600 text-sm">
+        Loading page verification...
+      </main>
+    }>
+      <VerifyContent />
+    </Suspense>
   );
 }

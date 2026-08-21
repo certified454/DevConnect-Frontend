@@ -11,152 +11,6 @@ import {
 import { useRouter } from 'next/navigation';
 import { COUNTRIES, type Country } from '@/lib/countries';
 
-// List of programming languages and frameworks for selection
-const languageOptions = [
-  'JavaScript',
-  'TypeScript',
-  'Python',
-  'Java',
-  'Go',
-  'C#',
-  'C++',
-  'C',
-  'Ruby',
-  'PHP',
-  'Swift',
-  'Kotlin',
-  'Dart',
-  'Rust',
-  'Scala',
-  'Elixir',
-  'Haskell',
-  'R',
-  'MATLAB',
-  'SQL',
-  'HTML',
-  'CSS',
-  'Shell',
-  'Bash',
-  'PowerShell',
-  'Lua',
-  'Perl',
-  'Objective-C',
-  'Assembly',
-  'Groovy',
-  'F#',
-  'Solidity',
-  'Julia',
-  'Zig',
-  'Elm',
-  'CoffeeScript',
-  'Fortran',
-  'Ada',
-  'VHDL',
-  'Verilog',
-];
-
-const frameworkOptions = [
-  'React',
-  'Next.js',
-  'Node.js',
-  'Express',
-  'Django',
-  'Flask',
-  'FastAPI',
-  'NestJS',
-  'Vue',
-  'Nuxt.js',
-  'Svelte',
-  'SvelteKit',
-  'Angular',
-  'Laravel',
-  'Spring Boot',
-  'ASP.NET Core',
-  'Ruby on Rails',
-  'Phoenix',
-  'Gin',
-  'Beego',
-  'Echo',
-  'Fiber',
-  'Actix',
-  'Rocket',
-  'Tauri',
-  'Electron',
-  'Flutter',
-  'React Native',
-  'Expo',
-  'Qt',
-  'WinUI',
-  'GTK',
-  'Unity',
-  'Unreal Engine',
-  'TensorFlow',
-  'PyTorch',
-  'Pandas',
-  'Scikit-learn',
-  'LangChain',
-  'OpenCV',
-  'Tailwind CSS',
-  'Bootstrap',
-  'MUI',
-  'Chakra UI',
-  'shadcn/ui',
-  'Ant Design',
-  'Bulma',
-  'Semantic UI',
-  'HTMX',
-  'Alpine.js',
-  'Stimulus',
-  'Remix',
-  'Astro',
-  'Gatsby',
-  'Vite',
-  'Webpack',
-  'TurboRepo',
-  'Nx',
-  'Docker',
-  'Kubernetes',
-  'Terraform',
-  'Ansible',
-  'Jenkins',
-  'GitHub Actions',
-  'GitLab CI',
-  'CircleCI',
-  'AWS',
-  'Azure',
-  'GCP',
-  'Firebase',
-  'Supabase',
-  'Appwrite',
-  'Prisma',
-  'Drizzle',
-  'TypeORM',
-  'Mongoose',
-  'SQLAlchemy',
-  'Hibernate',
-  'GraphQL',
-  'gRPC',
-  'Kafka',
-  'RabbitMQ',
-  'Redis',
-  'PostgreSQL',
-  'MySQL',
-  'MongoDB',
-  'SQLite',
-  'Elasticsearch',
-];
-
-const MAX_LANGUAGES = 5;
-const MAX_FRAMEWORKS = 8;
-
-const ratingLabels: Record<number, string> = {
-  1: 'Learning',
-  2: 'Beginner',
-  3: 'Comfortable',
-  4: 'Strong',
-  5: 'Expert',
-};
-
 export default function SignUpPage() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [username, setUsername] = useState('');
@@ -164,16 +18,12 @@ export default function SignUpPage() {
   const [phone, setPhone] = useState('');
   const [profilePic, setProfilePic] = useState('');
   const [country, setCountry] = useState<Country>(
-    COUNTRIES.find((item) => item.code === 'NG') ?? COUNTRIES[0]
+    COUNTRIES.find((item) => item.code === 'US') ?? COUNTRIES[0]
   );
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [selectedLanguages, setSelectedLanguages] = useState<string[]>([]);
-  const [selectedFrameworks, setSelectedFrameworks] = useState<string[]>([]);
-  const [ratings, setRatings] = useState<Record<string, number>>({});
-  const [languageInput, setLanguageInput] = useState('');
-  const [frameworkInput, setFrameworkInput] = useState('');
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
   const toast = useToast();
@@ -197,10 +47,6 @@ export default function SignUpPage() {
 
   const removeSkill = (value: string, list: string[], setter: (value: string[]) => void) => {
     setter(list.filter((item) => item !== value));
-  };
-
-  const updateRating = (skill: string, value: number) => {
-    setRatings((prev) => ({ ...prev, [skill]: value }));
   };
 
   const handleUsernameChange = (value: string) => {
@@ -294,81 +140,14 @@ export default function SignUpPage() {
           ? 'Good'
           : 'Strong';
 
-  const renderSkillSelector = (
-    options: string[],
-    value: string,
-    onChange: (value: string) => void,
-    onAdd: () => void,
-    selectedItems: string[],
-    limit: number,
-    onRemove: (value: string) => void
-  ) => (
-    <div className="space-y-3">
-      <div className="flex flex-col gap-2 md:flex-row">
-        <select
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none"
-        >
-          <option value="">Select one...</option>
-          {options.map((option) => (
-            <option key={option} value={option}>
-              {option}
-            </option>
-          ))}
-        </select>
-        <button
-          type="button"
-          onClick={onAdd}
-          className="rounded-2xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-500"
-        >
-          Add
-        </button>
-      </div>
-
-      <p className="text-xs text-slate-500">
-        {selectedItems.length}/{limit} selected
-      </p>
-
-      <div className="flex flex-wrap gap-2">
-        {selectedItems.map((item) => (
-          <div key={item} className="flex items-center gap-2 rounded-full border border-emerald-200 bg-white px-3 py-2 text-sm font-medium text-emerald-700">
-            <span>{item}</span>
-            <button type="button" onClick={() => onRemove(item)} className="text-xs text-slate-500 hover:text-emerald-700">
-              ×
-            </button>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-
-  const renderSelectedSkills = (selectedItems: string[]) =>
-    selectedItems.map((item) => (
-      <div key={item} className="rounded-2xl border border-slate-200 bg-slate-50/80 p-3">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <p className="text-sm font-semibold text-slate-800">{item}</p>
-            <p className="text-xs text-slate-500">{ratingLabels[ratings[item] ?? 3]} proficiency</p>
-          </div>
-          <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-700">
-            {ratings[item] ?? 3}/5
-          </span>
-        </div>
-        <input
-          type="range"
-          min="1"
-          max="5"
-          step="1"
-          value={ratings[item] ?? 3}
-          onChange={(e) => updateRating(item, Number(e.target.value))}
-          className="mt-3 h-2 w-full cursor-pointer appearance-none rounded-full bg-slate-200 accent-emerald-600"
-        />
-      </div>
-    ));
-
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!acceptedTerms) {
+      showToast('Action Required', 'You must accept the Terms of Use and Privacy Policy to continue.', 'error');
+      return;
+    }
+
     setIsLoading(true);
 
     try {
@@ -383,8 +162,7 @@ export default function SignUpPage() {
           profilePic,
           password,
           confirmPassword,
-          languages: selectedLanguages,
-          frameworks: selectedFrameworks,
+          acceptedTerms,
         }),
       });
 
@@ -507,7 +285,7 @@ export default function SignUpPage() {
                 type="text"
                 value={username}
                 onChange={(e) => handleUsernameChange(e.target.value)}
-                placeholder="sightertech"
+                placeholder="@yourexample"
                 className="w-full border-0 bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400"
               />
             </div>
@@ -563,7 +341,7 @@ export default function SignUpPage() {
                   type="tel"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value.replace(/[^0-9\s()-]/g, ''))}
-                  placeholder="812 345 6789"
+                  placeholder="456-789-0123"
                   className="min-w-0 flex-1 border-0 bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400"
                 />
               </div>
@@ -618,51 +396,39 @@ export default function SignUpPage() {
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="mt-1 text-sm text-emerald-700">
-                    <span className="font-bold md:text-lg text-sm">Recommended:</span> fill the signup form manually so we can connect you with people who share your stack and skills.
+                    <span className="font-bold md:text-lg text-sm">Recommended:</span> You can add your languages and frameworks later on your profile to join hangouts.
                   </p>
-                </div>
-              </div>
-
-              <div className="mt-4 space-y-4">
-                <div>
-                  <p className="mb-2 text-sm font-semibold text-slate-800">Languages you know</p>
-                  {renderSkillSelector(
-                    languageOptions,
-                    languageInput,
-                    setLanguageInput,
-                    () => addSkill(languageInput, selectedLanguages, setSelectedLanguages, MAX_LANGUAGES, setLanguageInput),
-                    selectedLanguages,
-                    MAX_LANGUAGES,
-                    (value) => removeSkill(value, selectedLanguages, setSelectedLanguages)
-                  )}
-                  <div className="mt-3 space-y-2">{renderSelectedSkills(selectedLanguages)}</div>
-                </div>
-
-                <div>
-                  <p className="mb-2 text-sm font-semibold text-slate-800">Frameworks and tools</p>
-                  {renderSkillSelector(
-                    frameworkOptions,
-                    frameworkInput,
-                    setFrameworkInput,
-                    () => addSkill(frameworkInput, selectedFrameworks, setSelectedFrameworks, MAX_FRAMEWORKS, setFrameworkInput),
-                    selectedFrameworks,
-                    MAX_FRAMEWORKS,
-                    (value) => removeSkill(value, selectedFrameworks, setSelectedFrameworks)
-                  )}
-                  <div className="mt-3 space-y-2">{renderSelectedSkills(selectedFrameworks)}</div>
                 </div>
               </div>
             </div>
 
-            <label className="flex items-start gap-2 text-sm text-slate-600">
-              <input type="checkbox" required className="mt-1 h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500" />
-              <span>I agree to the community guidelines and privacy policy.</span>
+            {/* Terms of Use & Privacy Policy Agreement */}
+            <label htmlFor="terms" className="flex items-start gap-3 cursor-pointer text-sm text-slate-600">
+              <input
+                id="terms"
+                type="checkbox"
+                required
+                checked={acceptedTerms}
+                onChange={(e) => setAcceptedTerms(e.target.checked)}
+                className="mt-1 h-4 w-4 shrink-0 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+              />
+              <span>
+                I have read and agree to the{' '}
+                <Link href="/terms" target="_blank" className="font-semibold text-emerald-600 underline hover:text-emerald-700">
+                  Terms of Use
+                </Link>{' '}
+                and{' '}
+                <Link href="/privacy" target="_blank" className="font-semibold text-emerald-600 underline hover:text-emerald-700">
+                  Privacy Policy
+                </Link>
+                .
+              </span>
             </label>
 
             <button
               type="submit"
-              disabled={isLoading}
-              className="flex w-full items-center justify-center gap-2 rounded-full bg-emerald-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-75"
+              disabled={isLoading || !acceptedTerms}
+              className="flex w-full items-center justify-center gap-2 rounded-full bg-emerald-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {isLoading ? (
                 <>
