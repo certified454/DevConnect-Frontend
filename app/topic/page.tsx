@@ -22,20 +22,18 @@ const programmingLanguages = [
 
 export default function CreateTopicPage() {
   const router = useRouter();
-
-  // Mongoose Model Fields
+  
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
-  const [codeSnippet, setCodeSnippet] = useState('');
   const [language, setLanguage] = useState('');
-  const [imageUrl, setImageUrl] = useState('');
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const addTag = (raw: string) => {
     const t = raw.trim();
     if (!t) return;
-    // ensure tag starts with '#'
     const normalized = t.startsWith('#') ? t : `#${t}`;
     if (tags.includes(normalized)) return;
     setTags((s) => [...s, normalized]);
@@ -53,15 +51,10 @@ export default function CreateTopicPage() {
     }
   };
 
-  // UI state
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
 
-    // Frontend validation matching controller requirements
     if (!title.trim()) {
       setError('Post title is required.');
       return;
@@ -77,7 +70,6 @@ export default function CreateTopicPage() {
       const token = localStorage.getItem('authToken') || sessionStorage.getItem('authToken');
 
       if (!token) {
-        // Not authenticated -> redirect to signin
         setLoading(false);
         router.push('/auth/signin');
         return;
@@ -92,9 +84,7 @@ export default function CreateTopicPage() {
         body: JSON.stringify({
           title,
           content,
-          codeSnippet,
           language,
-          imageUrl,
           tags,
         }),
       });
@@ -103,9 +93,8 @@ export default function CreateTopicPage() {
 
       if (!res.ok) {
         throw new Error(data?.message || 'Failed to create post.');
-      }
-
-      // Success -> Redirect to homepage / feed
+      };
+      
       router.push('/');
     } catch (err: any) {
       console.error('Create Post Error:', err);
@@ -140,7 +129,7 @@ export default function CreateTopicPage() {
         )}
 
         <form onSubmit={handleSubmit} className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
-          {/* Main Inputs (Title & Content) */}
+          {/* Main Inputs */}
           <div className="space-y-4">
             <div className="rounded-3xl border border-slate-200 bg-slate-50/80 p-4 sm:p-5">
               <label htmlFor="title" className="mb-2 block text-sm font-semibold text-slate-700">
@@ -164,33 +153,17 @@ export default function CreateTopicPage() {
               <textarea
                 id="content"
                 required
-                rows={8}
+                rows={12}
                 value={content}
                 onChange={(e) => setContent(e.target.value)}
                 placeholder="Describe the problem, idea, question, or discussion you want the community to engage with..."
                 className="w-full resize-none border-0 bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400"
               />
             </div>
-
-            {/* Code Snippet Input */}
-            <div className="rounded-3xl border border-slate-200 bg-slate-50/80 p-4 sm:p-5">
-              <label htmlFor="codeSnippet" className="mb-2 block text-sm font-semibold text-slate-700">
-                Code Snippet <span className="text-xs font-normal text-slate-500">(optional)</span>
-              </label>
-              <textarea
-                id="codeSnippet"
-                rows={5}
-                value={codeSnippet}
-                onChange={(e) => setCodeSnippet(e.target.value)}
-                placeholder="// Paste code block here..."
-                className="w-full resize-none border-0 bg-transparent font-mono text-xs text-slate-900 outline-none placeholder:text-slate-400"
-              />
-            </div>
           </div>
 
           {/* Right Sidebar Options */}
           <div className="space-y-4">
-            {/* Language Selector */}
             <div className="rounded-3xl border border-slate-200 bg-slate-50/80 p-4 sm:p-5">
               <label htmlFor="language" className="mb-2 block text-sm font-semibold text-slate-700">
                 Code Language
@@ -221,7 +194,7 @@ export default function CreateTopicPage() {
                     key={t}
                     type="button"
                     onClick={() => removeTag(t)}
-                    className="rounded-full bg-emerald-50 px-3 py-1 text-xs text-emerald-700 border border-emerald-100"
+                    className="rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1 text-xs text-emerald-700"
                   >
                     {t} ×
                   </button>
@@ -237,31 +210,7 @@ export default function CreateTopicPage() {
               />
             </div>
 
-            {/* Image URL Input */}
-            <div className="rounded-3xl border border-slate-200 bg-slate-50/80 p-4 sm:p-5">
-              <label htmlFor="imageUrl" className="mb-2 block text-sm font-semibold text-slate-700">
-                Image URL
-              </label>
-              <input
-                id="imageUrl"
-                type="url"
-                value={imageUrl}
-                onChange={(e) => setImageUrl(e.target.value)}
-                placeholder="https://example.com/image.png"
-                className="w-full border-0 bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400"
-              />
-            </div>
-
-            <div className="rounded-3xl border border-emerald-200 bg-emerald-50/70 p-4 sm:p-5">
-              <p className="text-sm font-semibold text-emerald-800">Before you publish</p>
-              <ul className="mt-2 list-disc space-y-2 pl-5 text-sm text-emerald-700">
-                <li>Make the title clear and specific.</li>
-                <li>Give enough context so people can reply meaningfully.</li>
-                <li>Format any code snippets properly.</li>
-              </ul>
-            </div>
-
-            <div className="flex flex-col gap-3 sm:flex-row">
+            <div className="pt-2">
               <button
                 type="submit"
                 disabled={loading}
