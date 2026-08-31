@@ -23,6 +23,7 @@
     "@react-aria/selection": "^3.28.1",
     "@react-aria/ssr": "^3.10.1",
     "@react-aria/utils": "^3.34.1",
+    "agora-rtc-sdk-ng": "^4.24.7",
     "dom-helpers": "^5.2.1",
     "geist": "^1.7.2",
     "naija-state-local-government": "^1.1.2",

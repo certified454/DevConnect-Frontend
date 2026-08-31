@@ -11,6 +11,40 @@ const HANGOUT_ID = 'devconnect-hangout-1';
 const HANGOUT_STORAGE_KEY = 'devconnect-joined-hangouts';
 const MAX_CONCURRENT_SCREEN_SHARES = 2;
 
+// ── Agora config ──────────────────────────────────────────────────────────
+// Put your App ID in .env.local as NEXT_PUBLIC_AGORA_APP_ID=xxxx
+// (copy it from Console > Projects > DevConnect > Basic Settings > App ID).
+// Never hardcode it directly in source that gets committed.
+const AGORA_APP_ID = process.env.NEXT_PUBLIC_AGORA_APP_ID ?? '';
+const AGORA_CHANNEL = HANGOUT_ID;
+
+// The SDK touches `window`, so it's loaded lazily inside effects instead of
+// as a top-level import — this avoids Next.js SSR build errors.
+let agoraSdkPromise: Promise<typeof import('agora-rtc-sdk-ng')> | null = null;
+function loadAgoraSdk() {
+  if (!agoraSdkPromise) {
+    agoraSdkPromise = import('agora-rtc-sdk-ng');
+  }
+  return agoraSdkPromise;
+}
+
+// Your project currently has no App Certificate, so a null token works fine
+// for testing (Console > Security shows "Add a Certificate", not added yet).
+// Once you add a certificate, tokens become mandatory. Stand up a small
+// server route (e.g. /api/agora-token) that uses Agora's Token Builder to
+// mint a token server-side, and this function will start using it
+// automatically — no other code needs to change.
+async function fetchAgoraToken(channel: string, uid: number): Promise<string | null> {
+  try {
+    const res = await fetch(`/api/agora-token?channel=${encodeURIComponent(channel)}&uid=${uid}`);
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data?.token ?? null;
+  } catch {
+    return null;
+  }
+}
+
 type ChatMessage = {
   id: string;
   author: string;
@@ -44,6 +78,9 @@ const initialMessages: ChatMessage[] = [
   { id: 'm2', author: 'Mina', text: 'I am ready to share my progress on the auth flow.', tone: 'user' },
 ];
 
+// NOTE: these are still demo/placeholder people, not real connected users.
+// Real Agora participants show up separately under "Live connections" below,
+// since there's no backend yet mapping Agora UIDs to names/roles.
 const initialParticipants: Participant[] = [
   { id: 'host', name: 'Host Devconnect team', skill: 'Live host', role: 'host', handRaised: false, muted: false, sharingScreen: false, canShareScreen: true },
   { id: 'you', name: 'You', skill: 'Live collaboration', role: 'viewer', handRaised: false, muted: true, sharingScreen: false, canShareScreen: false },
@@ -91,6 +128,36 @@ function ChevronDownIcon() {
   );
 }
 
+// Plays any Agora local/remote video track into a div. Calling `.stop()` on
+// unmount only detaches playback — it does not close the track or release
+// the camera/mic device.
+function AgoraVideoView({
+  track,
+  className,
+  mirror,
+}: {
+  track: any;
+  className?: string;
+  mirror?: boolean;
+}) {
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (track && containerRef.current) {
+      track.play(containerRef.current, mirror ? { mirror: true } : undefined);
+    }
+    return () => {
+      try {
+        track?.stop();
+      } catch {
+        // no-op: track may already be closed
+      }
+    };
+  }, [track, mirror]);
+
+  return <div ref={containerRef} className={className} />;
+}
+
 export default function HangoutPage() {
   const [joined, setJoined] = useState(false);
   const [isLive, setIsLive] = useState(true);
@@ -102,8 +169,6 @@ export default function HangoutPage() {
   const [draft, setDraft] = useState('');
   const [participants, setParticipants] = useState<Participant[]>(initialParticipants);
   const [spotlights, setSpotlights] = useState<Spotlight[]>(initialSpotlights);
-  const [screenStream, setScreenStream] = useState<MediaStream | null>(null);
-  const [screenStreamOwnerId, setScreenStreamOwnerId] = useState<string | null>(null);
   const [shareError, setShareError] = useState<string | null>(null);
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [roomPanelOpen, setRoomPanelOpen] = useState(false);
@@ -112,24 +177,23 @@ export default function HangoutPage() {
   const [lastReadCount, setLastReadCount] = useState(initialMessages.length);
   const [chromeHidden, setChromeHidden] = useState(false);
 
-  const screenVideoRef = useRef<HTMLVideoElement>(null);
+  // ── Agora state ──────────────────────────────────────────────────────
+  const [agoraConnected, setAgoraConnected] = useState(false);
+  const [localVideoTrack, setLocalVideoTrack] = useState<any>(null); // camera, host only
+  const [localScreenTrack, setLocalScreenTrack] = useState<any>(null); // screen share
+  const [screenStreamOwnerId, setScreenStreamOwnerId] = useState<string | null>(null);
+  const [remoteUsers, setRemoteUsers] = useState<Record<string, any>>({});
+
+  const clientRef = useRef<any>(null); // main client: camera + mic
+  const screenClientRef = useRef<any>(null); // secondary client: screen track only
+  const localAudioTrackRef = useRef<any>(null);
+  const uidRef = useRef<number>(Math.floor(Math.random() * 1_000_000) + 1);
+  const screenUidRef = useRef<number>(uidRef.current + 1_000_000);
 
   useEffect(() => {
     const joinedHangouts = getStoredJoinedHangouts();
     setJoined(joinedHangouts.includes(HANGOUT_ID));
   }, []);
-
-  useEffect(() => {
-    if (screenVideoRef.current && screenStream) {
-      screenVideoRef.current.srcObject = screenStream;
-    }
-  }, [screenStream]);
-
-  useEffect(() => {
-    return () => {
-      screenStream?.getTracks().forEach((track) => track.stop());
-    };
-  }, [screenStream]);
 
   useEffect(() => {
     if (roomPanelOpen && activeTab === 'chat') {
@@ -156,11 +220,6 @@ export default function HangoutPage() {
     setDraft('');
   };
 
-  const toggleMic = () => {
-    if (!joined) return;
-    setMicEnabled((current) => !current);
-  };
-
   const raiseHandNow = () => {
     if (handRaised) return;
     setHandRaised(true);
@@ -178,6 +237,9 @@ export default function HangoutPage() {
   };
 
   const muteParticipant = (participantId: string) => {
+    // Real remote users can't be force-muted over plain RTC — that needs a
+    // signaling channel (Agora RTM, or your own backend) to tell that
+    // specific browser to disable its mic. This only affects the mock roster.
     setParticipants((current) =>
       current.map((p) => (p.id !== participantId ? p : { ...p, muted: !p.muted }))
     );
@@ -192,88 +254,283 @@ export default function HangoutPage() {
       })
     );
     if (screenStreamOwnerId === participantId) {
-      screenStream?.getTracks().forEach((t) => t.stop());
-      setScreenStream(null);
-      setScreenStreamOwnerId(null);
+      void stopScreenShare(participantId);
     }
   };
 
-  const shareScreen = (participantId: string) => {
-    const participant = participants.find((p) => p.id === participantId);
-    if (!participant) return;
-
-    setParticipants((current) => {
-      const isCurrentlySharing = current.find((p) => p.id === participantId)?.sharingScreen;
-      if (isCurrentlySharing) {
-        return current.map((p) => (p.id === participantId ? { ...p, sharingScreen: false } : p));
-      }
-      const otherSharers = current.filter((p) => p.sharingScreen && p.id !== participantId);
-      let next = current;
-      if (otherSharers.length >= MAX_CONCURRENT_SCREEN_SHARES) {
-        const [oldest] = otherSharers;
-        next = next.map((p) => (p.id === oldest.id ? { ...p, sharingScreen: false } : p));
-      }
-      return next.map((p) =>
-        p.id === participantId ? { ...p, sharingScreen: true, role: 'speaker' } : p
-      );
-    });
-
-    setSpotlights((current) => [
-      ...current.filter((s) => s.id !== participant.id),
-      { id: participant.id, name: participant.name, skill: participant.skill, role: 'speaker' },
-    ]);
+  // ── Core Agora lifecycle: join/leave the channel ────────────────────
+  const selfCanPublish = () => {
+    const self = isAdmin
+      ? participants.find((p) => p.id === 'host')
+      : participants.find((p) => p.id === 'you');
+    return isAdmin || self?.role !== 'viewer';
   };
 
-  const stopStream = (ownerId: string) => {
-    screenStream?.getTracks().forEach((t) => t.stop());
-    setScreenStream(null);
-    setScreenStreamOwnerId(null);
-    setShareError(null);
-    setParticipants((current) =>
-      current.map((p) => (p.id === ownerId ? { ...p, sharingScreen: false } : p))
-    );
+  useEffect(() => {
+    if (!joined || !isLive) return;
+
+    if (!AGORA_APP_ID) {
+      setShareError('Missing Agora App ID — set NEXT_PUBLIC_AGORA_APP_ID in your environment.');
+      return;
+    }
+
+    let cancelled = false;
+
+    (async () => {
+      const { default: AgoraRTC } = await loadAgoraSdk();
+      if (cancelled) return;
+
+      const client = AgoraRTC.createClient({ mode: 'live', codec: 'vp8' });
+      clientRef.current = client;
+
+      client.on('user-published', async (user: any, mediaType: 'audio' | 'video') => {
+        await client.subscribe(user, mediaType);
+        if (mediaType === 'audio') {
+          user.audioTrack?.play();
+        }
+        setRemoteUsers((current) => ({ ...current, [String(user.uid)]: user }));
+      });
+
+      client.on('user-unpublished', (user: any) => {
+        setRemoteUsers((current) => ({ ...current, [String(user.uid)]: user }));
+      });
+
+      client.on('user-left', (user: any) => {
+        setRemoteUsers((current) => {
+          const next = { ...current };
+          delete next[String(user.uid)];
+          return next;
+        });
+      });
+
+      try {
+        const role = selfCanPublish() ? 'host' : 'audience';
+        await client.setClientRole(role);
+        const token = await fetchAgoraToken(AGORA_CHANNEL, uidRef.current);
+        await client.join(AGORA_APP_ID, AGORA_CHANNEL, token, uidRef.current);
+        if (cancelled) return;
+        setAgoraConnected(true);
+        if (role === 'host') {
+          await publishSelfMedia();
+        }
+      } catch (err) {
+        console.error('Agora join failed', err);
+        if (!cancelled) {
+          setShareError('Could not connect to the live channel. Check your Agora App ID and network.');
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      void cleanupSelfMedia();
+      void stopScreenShare(screenStreamOwnerId ?? undefined, { silent: true });
+      const client = clientRef.current;
+      if (client) {
+        client.removeAllListeners();
+        client.leave().catch(() => {});
+      }
+      clientRef.current = null;
+      setAgoraConnected(false);
+      setRemoteUsers({});
+    };
+    // Only re-run when join state changes — role changes are handled by the
+    // effect below so we don't tear down and rejoin the whole channel.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [joined, isLive]);
+
+  // React to role changes (viewer promoted to speaker, admin toggled) without
+  // leaving and rejoining the channel.
+  useEffect(() => {
+    if (!agoraConnected || !clientRef.current) return;
+    (async () => {
+      const shouldPublish = selfCanPublish();
+      try {
+        await clientRef.current.setClientRole(shouldPublish ? 'host' : 'audience');
+        if (shouldPublish) {
+          await publishSelfMedia();
+        } else {
+          await cleanupSelfMedia();
+        }
+      } catch (err) {
+        console.error('Failed to update Agora role', err);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAdmin, participants, agoraConnected]);
+
+  useEffect(() => {
+    localAudioTrackRef.current?.setEnabled(canSpeak);
+  }, [micEnabled, adminMuted]);
+
+  const publishSelfMedia = async () => {
+    const client = clientRef.current;
+    if (!client) return;
+    const { default: AgoraRTC } = await loadAgoraSdk();
+
+    const tracksToPublish: any[] = [];
+
+    if (!localAudioTrackRef.current) {
+      localAudioTrackRef.current = await AgoraRTC.createMicrophoneAudioTrack();
+      localAudioTrackRef.current.setEnabled(canSpeak);
+    }
+    tracksToPublish.push(localAudioTrackRef.current);
+
+    if (isAdmin && !localVideoTrack) {
+      const camTrack = await AgoraRTC.createCameraVideoTrack();
+      setLocalVideoTrack(camTrack);
+      tracksToPublish.push(camTrack);
+    }
+
+    const alreadyPublished = new Set(client.localTracks?.map((t: any) => t) ?? []);
+    const newTracks = tracksToPublish.filter((t) => t && !alreadyPublished.has(t));
+    if (newTracks.length) {
+      await client.publish(newTracks);
+    }
   };
 
-  const startStream = async (selfId: string) => {
-    if (typeof window === 'undefined' || !navigator.mediaDevices?.getDisplayMedia) {
-      setShareError('Screen sharing is not supported in this browser.');
+  const cleanupSelfMedia = async () => {
+    const client = clientRef.current;
+    const tracks = [localAudioTrackRef.current, localVideoTrack].filter(Boolean);
+    if (client && tracks.length) {
+      try {
+        await client.unpublish(tracks);
+      } catch {
+        // already unpublished
+      }
+    }
+    localAudioTrackRef.current?.close();
+    localAudioTrackRef.current = null;
+    if (localVideoTrack) {
+      localVideoTrack.close();
+      setLocalVideoTrack(null);
+    }
+  };
+
+  const toggleMic = () => {
+    if (!joined) return;
+    setMicEnabled((current) => !current);
+  };
+
+  // ── Screen share: a second Agora client publishes the screen track with
+  // its own UID, so it can run alongside the camera+mic client. This is
+  // Agora's own recommended pattern for simultaneous camera + screen share.
+  const startScreenShare = async (ownerParticipantId: string) => {
+    if (!AGORA_APP_ID) {
+      setShareError('Missing Agora App ID — set NEXT_PUBLIC_AGORA_APP_ID in your environment.');
       return;
     }
     try {
-      const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
-      setScreenStream(stream);
-      setScreenStreamOwnerId(selfId);
+      const { default: AgoraRTC } = await loadAgoraSdk();
+      const created = await AgoraRTC.createScreenVideoTrack({ encoderConfig: '1080p_1' }, 'auto');
+      const videoTrack = Array.isArray(created) ? created[0] : created;
+      const audioTrack = Array.isArray(created) ? created[1] : undefined;
+
+      const screenClient = AgoraRTC.createClient({ mode: 'live', codec: 'vp8' });
+      await screenClient.setClientRole('host');
+      const token = await fetchAgoraToken(AGORA_CHANNEL, screenUidRef.current);
+      await screenClient.join(AGORA_APP_ID, AGORA_CHANNEL, token, screenUidRef.current);
+      await screenClient.publish(audioTrack ? [videoTrack, audioTrack] : [videoTrack]);
+
+      videoTrack.on('track-ended', () => {
+        void stopScreenShare(ownerParticipantId);
+      });
+
+      screenClientRef.current = screenClient;
+      setLocalScreenTrack(videoTrack);
+      setScreenStreamOwnerId(ownerParticipantId);
       setShareError(null);
-      setParticipants((current) =>
-        current.map((p) =>
-          p.id === selfId
-            ? { ...p, sharingScreen: true, role: p.role === 'viewer' ? 'speaker' : p.role }
-            : p
-        )
-      );
+
+      const owner = participants.find((p) => p.id === ownerParticipantId);
+      setParticipants((current) => {
+        const isCurrentlySharing = current.find((p) => p.id === ownerParticipantId)?.sharingScreen;
+        if (isCurrentlySharing) return current;
+        const otherSharers = current.filter((p) => p.sharingScreen && p.id !== ownerParticipantId);
+        let next = current;
+        if (otherSharers.length >= MAX_CONCURRENT_SCREEN_SHARES) {
+          const [oldest] = otherSharers;
+          next = next.map((p) => (p.id === oldest.id ? { ...p, sharingScreen: false } : p));
+        }
+        return next.map((p) =>
+          p.id === ownerParticipantId ? { ...p, sharingScreen: true, role: 'speaker' } : p
+        );
+      });
+
+      if (owner) {
+        setSpotlights((current) => [
+          ...current.filter((s) => s.id !== owner.id),
+          { id: owner.id, name: owner.name, skill: owner.skill, role: 'speaker' },
+        ]);
+      }
+
       setMessages((current) => [
         ...current,
         {
           id: `m-${Date.now()}`,
-          author: selfId === 'host' ? 'Devconnect team' : 'You',
+          author: ownerParticipantId === 'host' ? 'Devconnect team' : 'You',
           text: 'You are now sharing your screen with the room.',
-          tone: selfId === 'host' ? 'admin' : 'user',
+          tone: ownerParticipantId === 'host' ? 'admin' : 'user',
         },
       ]);
-    } catch {
+    } catch (err) {
+      console.error('Screen share failed', err);
       setShareError('Screen share permission was denied or cancelled.');
+    }
+  };
+
+  const stopScreenShare = async (ownerParticipantId?: string, opts?: { silent?: boolean }) => {
+    const client = screenClientRef.current;
+    if (client) {
+      try {
+        await client.leave();
+      } catch {
+        // already left
+      }
+    }
+    screenClientRef.current = null;
+    setLocalScreenTrack((current: any) => {
+      current?.close();
+      return null;
+    });
+    setScreenStreamOwnerId(null);
+    if (!opts?.silent) setShareError(null);
+    if (ownerParticipantId) {
+      setParticipants((current) =>
+        current.map((p) => (p.id === ownerParticipantId ? { ...p, sharingScreen: false } : p))
+      );
     }
   };
 
   const toggleSelfScreenShare = async (selfId: string, allowed: boolean) => {
     if (!allowed) return;
-    if (screenStream) { stopStream(selfId); return; }
-    await startStream(selfId);
+    if (screenStreamOwnerId === selfId) {
+      await stopScreenShare(selfId);
+    } else {
+      await startScreenShare(selfId);
+    }
   };
 
   const toggleHostScreenShare = async () => {
-    if (screenStream) { stopStream(screenStreamOwnerId ?? 'host'); return; }
-    await startStream('host');
+    if (screenStreamOwnerId) {
+      await stopScreenShare(screenStreamOwnerId);
+    } else {
+      await startScreenShare('host');
+    }
+  };
+
+  // Admin-triggered "make this participant share" only works for a browser
+  // you actually control (i.e. yourself). For a real remote participant to
+  // start sharing on the admin's command, that participant's own browser
+  // needs to receive the instruction — via Agora RTM or your backend's
+  // realtime layer — and call startScreenShare() itself.
+  const shareScreen = (participantId: string) => {
+    if (participantId === (isAdmin ? 'host' : 'you')) {
+      void toggleSelfScreenShare(participantId, true);
+      return;
+    }
+    setParticipants((current) =>
+      current.map((p) => (p.id === participantId ? { ...p, sharingScreen: !p.sharingScreen } : p))
+    );
   };
 
   const toggleFullScreen = async () => {
@@ -307,11 +564,12 @@ export default function HangoutPage() {
   const selfParticipant = isAdmin ? hostParticipant : (participants.find((p) => p.id === 'you') ?? participants[1]);
   const selfCanShare = !!selfParticipant && (selfParticipant.id === 'host' || selfParticipant.canShareScreen);
   const selfIsSpeaker = selfParticipant?.role !== 'viewer';
-  const selfIsSharing = !!selfParticipant && screenStreamOwnerId === selfParticipant.id && !!screenStream;
+  const selfIsSharing = !!selfParticipant && screenStreamOwnerId === selfParticipant.id;
   const handRaisedCount = participants.filter((p) => p.handRaised).length;
   const speakingCount = participants.filter((p) => p.role !== 'viewer').length;
   const unreadMessages = Math.max(0, messages.length - lastReadCount);
   const hostMicLabel = hostParticipant?.muted ? 'Mic muted' : canSpeak ? 'Mic live' : 'Mic muted';
+  const remoteUsersList = Object.values(remoteUsers);
 
   const visibleParticipants = participants.filter((p) => {
     if (queueFilter === 'raised') return p.handRaised;
@@ -345,7 +603,7 @@ export default function HangoutPage() {
         {selfCanShare ? (
           <Button
             onPress={() => toggleSelfScreenShare(selfParticipant.id, selfCanShare)}
-            className={screenStream ? 'rounded-full border border-emerald-500/40 bg-emerald-500/15 px-3 py-2' : 'rounded-full border border-slate-700 bg-slate-900 px-3 py-2'}
+            className={selfIsSharing ? 'rounded-full border border-emerald-500/40 bg-emerald-500/15 px-3 py-2' : 'rounded-full border border-slate-700 bg-slate-900 px-3 py-2'}
           >
             <ButtonText className="text-sm font-semibold text-white">
               {selfIsSharing ? 'Stop sharing' : 'Share my screen'}
@@ -369,8 +627,8 @@ export default function HangoutPage() {
           <Text className="text-[11px] uppercase tracking-[0.2em] text-emerald-300">Focused</Text>
         </Box>
       </Box>
-      {sharer.id === screenStreamOwnerId && screenStream ? (
-        <video ref={screenVideoRef} autoPlay playsInline muted className="mt-3 min-h-0 w-full flex-1 rounded-[1.1rem] object-cover" />
+      {sharer.id === screenStreamOwnerId && localScreenTrack ? (
+        <AgoraVideoView track={localScreenTrack} className="mt-3 min-h-0 w-full flex-1 rounded-[1.1rem] object-cover" />
       ) : (
         <Box className="mt-3 flex min-h-0 flex-1 items-center justify-center rounded-[1.1rem] border border-dashed border-slate-700 bg-slate-950/70 p-4 text-center">
           <Text className="text-sm text-slate-300">
@@ -450,11 +708,14 @@ export default function HangoutPage() {
             {showChrome ? (
               <Box className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-800 bg-slate-900/70 px-4 py-3">
                 <Box className="flex items-center gap-3">
-                  <Box className="rounded-full bg-rose-500/20 px-3 py-1">
-                    <Text className="text-xs font-semibold uppercase tracking-[0.25em] text-rose-300">Live</Text>
+                  <Box className={`rounded-full px-3 py-1 ${agoraConnected ? 'bg-rose-500/20' : 'bg-slate-700/40'}`}>
+                    <Text className={`text-xs font-semibold uppercase tracking-[0.25em] ${agoraConnected ? 'text-rose-300' : 'text-slate-400'}`}>
+                      {agoraConnected ? 'Live' : 'Connecting…'}
+                    </Text>
                   </Box>
                   <Text className="text-sm text-slate-400">
                     {screenSharers.length > 0 ? `${screenSharers.length} sharing screen` : 'No one sharing a screen yet'}
+                    {remoteUsersList.length > 0 ? ` · ${remoteUsersList.length} real connection${remoteUsersList.length === 1 ? '' : 's'}` : ''}
                   </Text>
                 </Box>
                 <Box className="flex flex-wrap items-center gap-2">
@@ -542,8 +803,10 @@ export default function HangoutPage() {
                     </Box>
                   </Box>
                   <Box className="flex flex-1 items-center justify-center rounded-[1.1rem] border border-dashed border-slate-700 bg-slate-950/70 p-4 text-center">
-                    {screenStreamOwnerId === 'host' && screenStream ? (
-                      <video ref={screenVideoRef} autoPlay playsInline muted className="h-full w-full rounded-[1.1rem] object-cover" />
+                    {screenStreamOwnerId === 'host' && localScreenTrack ? (
+                      <AgoraVideoView track={localScreenTrack} className="h-full w-full rounded-[1.1rem] object-cover" />
+                    ) : isAdmin && localVideoTrack ? (
+                      <AgoraVideoView track={localVideoTrack} className="h-full w-full rounded-[1.1rem] object-cover" mirror />
                     ) : (
                       <Text className="text-sm text-slate-300">{hostParticipant?.name} is live on camera and ready to speak.</Text>
                     )}
@@ -557,9 +820,13 @@ export default function HangoutPage() {
                     {screenSharers[0] ? `${screenSharers[0].name}'s screen` : 'Screen share slot 1'}
                   </Text>
                   <Box className="mt-3 flex min-h-0 flex-1 items-center justify-center rounded-[1.1rem] border border-dashed border-slate-700 bg-slate-950/70 p-4 text-center">
-                    <Text className="text-sm text-slate-400">
-                      {screenSharers[0]?.name ? `${screenSharers[0].name} is sharing their screen.` : 'Waiting for a challenger to share their screen.'}
-                    </Text>
+                    {screenSharers[0] && screenSharers[0].id === screenStreamOwnerId && localScreenTrack ? (
+                      <AgoraVideoView track={localScreenTrack} className="h-full w-full rounded-[1.1rem] object-cover" />
+                    ) : (
+                      <Text className="text-sm text-slate-400">
+                        {screenSharers[0]?.name ? `${screenSharers[0].name} is sharing their screen.` : 'Waiting for a challenger to share their screen.'}
+                      </Text>
+                    )}
                   </Box>
                 </Box>
 
@@ -569,13 +836,39 @@ export default function HangoutPage() {
                     {screenSharers[1] ? `${screenSharers[1].name}'s screen` : 'Screen share slot 2'}
                   </Text>
                   <Box className="mt-3 flex min-h-0 flex-1 items-center justify-center rounded-[1.1rem] border border-dashed border-slate-700 bg-slate-950/70 p-4 text-center">
-                    <Text className="text-sm text-slate-400">
-                      {screenSharers[1]?.name ? `${screenSharers[1].name} is sharing their screen.` : 'Waiting for a second challenger to share their screen.'}
-                    </Text>
+                    {screenSharers[1] && screenSharers[1].id === screenStreamOwnerId && localScreenTrack ? (
+                      <AgoraVideoView track={localScreenTrack} className="h-full w-full rounded-[1.1rem] object-cover" />
+                    ) : (
+                      <Text className="text-sm text-slate-400">
+                        {screenSharers[1]?.name ? `${screenSharers[1].name} is sharing their screen.` : 'Waiting for a second challenger to share their screen.'}
+                      </Text>
+                    )}
                   </Box>
                 </Box>
               </Box>
             )}
+
+            {/* Real Agora connections — separate from the mock roster above,
+                since these are actual people who joined the channel. */}
+            {remoteUsersList.length > 0 ? (
+              <Box className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
+                <Text className="text-sm font-semibold text-white">Live connections ({remoteUsersList.length})</Text>
+                <Box className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                  {remoteUsersList.map((user: any) => (
+                    <Box key={user.uid} className="flex flex-col rounded-xl border border-slate-800 bg-slate-950/70 p-2">
+                      <Text className="text-xs text-slate-400">Guest {user.uid}</Text>
+                      {user.videoTrack ? (
+                        <AgoraVideoView track={user.videoTrack} className="mt-1 h-24 w-full rounded-lg object-cover" />
+                      ) : (
+                        <Box className="mt-1 flex h-24 items-center justify-center rounded-lg border border-dashed border-slate-700">
+                          <Text className="text-[11px] text-slate-500">Audio only</Text>
+                        </Box>
+                      )}
+                    </Box>
+                  ))}
+                </Box>
+              </Box>
+            ) : null}
 
             {shareError ? <Text className="text-sm text-amber-300">{shareError}</Text> : null}
           </Box>
