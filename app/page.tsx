@@ -621,6 +621,7 @@ export default function Home() {
     { label: 'Home', href: '/', icon: <HouseIcon />, active: currentSection === 'home' },
     { label: 'Hangout', href: '/hangout', icon: <CalendarIcon />, active: currentSection === 'hangout' },
     { label: 'Discussion', href: '/discussion', icon: <MessageIcon />, active: false },
+    { label: 'Discussion', href: '#discussion', icon: <MessageIcon />, active: false },
     { label: 'Hub', href: '#hub', icon: <SparkIcon />, active: false },
   ];
 

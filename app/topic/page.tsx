@@ -23,7 +23,7 @@ const programmingLanguages = [
 export default function CreateTopicPage() {
   const router = useRouter();
 
-  // Mongoose Model Fields
+  // Mongoose Model Fields & UI State
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [codeSnippet, setCodeSnippet] = useState('');
@@ -31,11 +31,12 @@ export default function CreateTopicPage() {
   const [imageUrl, setImageUrl] = useState('');
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const addTag = (raw: string) => {
     const t = raw.trim();
     if (!t) return;
-    // ensure tag starts with '#'
     const normalized = t.startsWith('#') ? t : `#${t}`;
     if (tags.includes(normalized)) return;
     setTags((s) => [...s, normalized]);
@@ -52,10 +53,6 @@ export default function CreateTopicPage() {
       addTag(tagInput);
     }
   };
-
-  // UI state
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -221,7 +218,7 @@ export default function CreateTopicPage() {
                     key={t}
                     type="button"
                     onClick={() => removeTag(t)}
-                    className="rounded-full bg-emerald-50 px-3 py-1 text-xs text-emerald-700 border border-emerald-100"
+                    className="rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1 text-xs text-emerald-700"
                   >
                     {t} ×
                   </button>
@@ -261,7 +258,7 @@ export default function CreateTopicPage() {
               </ul>
             </div>
 
-            <div className="flex flex-col gap-3 sm:flex-row">
+            <div className="pt-2">
               <button
                 type="submit"
                 disabled={loading}
