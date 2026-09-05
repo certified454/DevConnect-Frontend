@@ -770,13 +770,12 @@ export default function HangoutRoomPage() {
         {/* Stage layout supporting multiple concurrent screens */}
         {isFocusMode ? (
           <Box className={`flex flex-col gap-3 ${showChrome ? 'lg:h-[calc(120vh-220px)]' : 'lg:h-[calc(120vh-80px)]'}`}>
-          <Box className={`flex flex-col gap-3 ${showChrome ? 'lg:h-[calc(100vh-220px)]' : 'lg:h-[calc(100vh-80px)]'}`}>
             <Box className={`grid flex-1 gap-4 ${screenSharers.length > 1 ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1'}`}>
               {screenSharers.map((sharer) => renderSharerTile(sharer))}
             </Box>
           </Box>
         ) : (
-          <Box className="flex w-full gap-3 min-h-[70vh] lg:h-[calc(100vh-200px)]">
+          <Box className="flex w-full gap-3 min-h-[70vh] lg:h-[calc(120vh-200px)]">
             <Box className="flex w-full flex-1 flex-col justify-between gap-4 rounded-[1.5rem] border border-slate-800 bg-slate-900/80 p-5">
               <Box className="flex items-start justify-between">
                 <Box>
