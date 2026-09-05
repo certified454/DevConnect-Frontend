@@ -1,754 +1,499 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Avatar, AvatarImage } from '@/components/ui/avatar';
 import { Box } from '@/components/ui/box';
 import { Button, ButtonText } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Text } from '@/components/ui/text';
+import {
+  Toast,
+  ToastTitle,
+  ToastDescription,
+  useToast,
+} from '@/components/ui/toast';
 
-const HANGOUT_ID = 'devconnect-hangout-1';
-const HANGOUT_STORAGE_KEY = 'devconnect-joined-hangouts';
-const MAX_CONCURRENT_SCREEN_SHARES = 2;
-
-type ChatMessage = {
-  id: string;
-  author: string;
-  text: string;
-  tone: 'system' | 'user' | 'admin';
-};
-
-type Participant = {
-  id: string;
-  name: string;
-  skill: string;
-  role: 'host' | 'speaker' | 'viewer';
-  handRaised: boolean;
-  muted: boolean;
-  sharingScreen: boolean;
-  canShareScreen: boolean;
-};
-
-type Spotlight = {
-  id: string;
-  name: string;
-  skill: string;
-  role: 'challenger' | 'speaker';
-};
-
-type QueueFilter = 'all' | 'raised' | 'speaking';
-type RoomTab = 'chat' | 'people' | 'match';
-
-const initialMessages: ChatMessage[] = [
-  { id: 'm1', author: 'Devconnect team', text: 'Welcome to the live room. Mic access is controlled by the host.', tone: 'admin' },
-  { id: 'm2', author: 'Mina', text: 'I am ready to share my progress on the auth flow.', tone: 'user' },
-];
-
-const initialParticipants: Participant[] = [
-  { id: 'host', name: 'Host Devconnect team', skill: 'Live host', role: 'host', handRaised: false, muted: false, sharingScreen: false, canShareScreen: true },
-  { id: 'you', name: 'You', skill: 'Live collaboration', role: 'viewer', handRaised: false, muted: true, sharingScreen: false, canShareScreen: false },
-  { id: 'mina', name: 'Mina', skill: 'Authentication flows', role: 'viewer', handRaised: true, muted: true, sharingScreen: false, canShareScreen: false },
-  { id: 'tolu', name: 'Tolu', skill: 'Design systems', role: 'viewer', handRaised: true, muted: true, sharingScreen: false, canShareScreen: false },
-  { id: 'bisi', name: 'Bisi', skill: 'Frontend performance', role: 'viewer', handRaised: false, muted: true, sharingScreen: false, canShareScreen: false },
-];
-
-const initialSpotlights: Spotlight[] = [
-  { id: 's1', name: 'Ada', skill: 'AI agent orchestration', role: 'challenger' },
-  { id: 's2', name: 'Timi', skill: 'Frontend performance', role: 'speaker' },
-];
-
-function getStoredJoinedHangouts() {
-  if (typeof window === 'undefined') return [];
-  try {
-    const stored = window.localStorage.getItem(HANGOUT_STORAGE_KEY);
-    return stored ? (JSON.parse(stored) as string[]) : [];
-  } catch {
-    return [];
-  }
+interface HangoutHost {
+  _id: string;
+  username: string;
+  profilePic?: string;
 }
 
-function HamburgerIcon() {
+interface HangoutData {
+  _id: string;
+  host: HangoutHost;
+  topic: string;
+  channelName: string;
+  status: 'Upcoming' | 'Live' | 'Ended';
+  startedAt?: string;
+  endedAt?: string;
+  scheduledAt: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+type StatusFilter = 'Live' | 'Upcoming' | 'Ended';
+
+const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, '');
+const hangoutEndpoint = `${apiBaseUrl}/api/hangouts`;
+
+function getToken(): string {
+  if (typeof window === 'undefined') return '';
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    window.localStorage.getItem('authToken') ??
+    window.sessionStorage.getItem('authToken') ??
+    window.localStorage.getItem('token') ??
+    ''
+  );
+}
+
+function formatDuration(ms: number): string {
+  const abs = Math.max(0, Math.abs(ms));
+  const totalSeconds = Math.floor(abs / 1000);
+  const days = Math.floor(totalSeconds / 86400);
+  const hours = Math.floor((totalSeconds % 86400) / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+
+  if (days > 0) return `${days}d ${hours}h`;
+  if (hours > 0) return `${hours}h ${minutes}m`;
+  if (minutes > 0) return `${minutes}m ${seconds}s`;
+  return `${seconds}s`;
+}
+
+// ── Icons ──────────────────────────────────────────────────────────────
+function CalendarIcon({ className = 'h-4 w-4' }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className}>
+      <path d="M7 2a1 1 0 0 1 1 1v1h8V3a1 1 0 1 1 2 0v1h1a3 3 0 0 1 3 3v12a3 3 0 0 1-3 3H5a3 3 0 0 1-3-3V6a3 3 0 0 1 3-3h1V3a1 1 0 0 1 1-1Zm13 8H4v8a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-8Z" />
     </svg>
   );
 }
 
-function CloseIcon() {
+function PlusIcon({ className = 'h-4 w-4' }: { className?: string }) {
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" className={className}>
+      <path d="M12 5v14M5 12h14" strokeLinecap="round" />
     </svg>
   );
 }
 
-function ChevronDownIcon() {
+function SignalIcon({ className = 'h-4 w-4' }: { className?: string }) {
   return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className}>
+      <path d="M4 15v4M9 11v8M14 7v12M19 4v15" strokeLinecap="round" />
     </svg>
   );
 }
 
-export default function HangoutPage() {
-  const [joined, setJoined] = useState(false);
-  const [isLive, setIsLive] = useState(true);
-  const [isAdmin, setIsAdmin] = useState(true);
-  const [micEnabled, setMicEnabled] = useState(false);
-  const [adminMuted, setAdminMuted] = useState(false);
-  const [handRaised, setHandRaised] = useState(false);
-  const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
-  const [draft, setDraft] = useState('');
-  const [participants, setParticipants] = useState<Participant[]>(initialParticipants);
-  const [spotlights, setSpotlights] = useState<Spotlight[]>(initialSpotlights);
-  const [screenStream, setScreenStream] = useState<MediaStream | null>(null);
-  const [screenStreamOwnerId, setScreenStreamOwnerId] = useState<string | null>(null);
-  const [shareError, setShareError] = useState<string | null>(null);
-  const [isFullScreen, setIsFullScreen] = useState(false);
-  const [roomPanelOpen, setRoomPanelOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<RoomTab>('chat');
-  const [queueFilter, setQueueFilter] = useState<QueueFilter>('all');
-  const [lastReadCount, setLastReadCount] = useState(initialMessages.length);
-  const [chromeHidden, setChromeHidden] = useState(false);
+function EmptyIllustration({ className = 'h-9 w-9' }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className={className}>
+      <circle cx="12" cy="8" r="3.2" />
+      <path d="M4.5 20c1-3.4 4-5.4 7.5-5.4S18.5 16.6 19.5 20" strokeLinecap="round" />
+    </svg>
+  );
+}
 
-  const screenVideoRef = useRef<HTMLVideoElement>(null);
+function DotGrid({ className = '' }: { className?: string }) {
+  return (
+    <div
+      className={`pointer-events-none absolute inset-0 opacity-[0.07] [background-image:radial-gradient(currentColor_1px,transparent_1px)] [background-size:20px_20px] ${className}`}
+    />
+  );
+}
 
-  useEffect(() => {
-    const joinedHangouts = getStoredJoinedHangouts();
-    setJoined(joinedHangouts.includes(HANGOUT_ID));
-  }, []);
+function StatChip({
+  value,
+  label,
+  tone,
+}: {
+  value: number;
+  label: string;
+  tone: 'rose' | 'emerald';
+}) {
+  const toneClasses =
+    tone === 'rose'
+      ? 'border-rose-400/30 bg-rose-500/10 text-rose-300'
+      : 'border-emerald-400/30 bg-emerald-500/10 text-emerald-300';
+  return (
+    <Box className={`flex-row items-center gap-1.5 rounded-full border px-3 py-1.5 ${toneClasses}`}>
+      {tone === 'rose' ? <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-rose-400" /> : null}
+      <Text className={`font-mono text-xs font-semibold ${tone === 'rose' ? 'text-rose-300' : 'text-emerald-300'}`}>
+        {value}
+      </Text>
+      <Text className={`text-xs ${tone === 'rose' ? 'text-rose-300/80' : 'text-emerald-300/80'}`}>{label}</Text>
+    </Box>
+  );
+}
 
-  useEffect(() => {
-    if (screenVideoRef.current && screenStream) {
-      screenVideoRef.current.srcObject = screenStream;
-    }
-  }, [screenStream]);
-
-  useEffect(() => {
-    return () => {
-      screenStream?.getTracks().forEach((track) => track.stop());
-    };
-  }, [screenStream]);
-
-  useEffect(() => {
-    if (roomPanelOpen && activeTab === 'chat') {
-      setLastReadCount(messages.length);
-    }
-  }, [roomPanelOpen, activeTab, messages.length]);
-
-  const handleJoinHangout = () => {
-    const existing = getStoredJoinedHangouts();
-    const updated = existing.includes(HANGOUT_ID) ? existing : [...existing, HANGOUT_ID];
-    setJoined(true);
-    if (typeof window !== 'undefined') {
-      window.localStorage.setItem(HANGOUT_STORAGE_KEY, JSON.stringify(updated));
-    }
-  };
-
-  const handleSendMessage = (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!draft.trim()) return;
-    setMessages((current) => [
-      ...current,
-      { id: `m-${Date.now()}`, author: 'You', text: draft.trim(), tone: 'user' },
-    ]);
-    setDraft('');
-  };
-
-  const toggleMic = () => {
-    if (!joined) return;
-    setMicEnabled((current) => !current);
-  };
-
-  const raiseHandNow = () => {
-    if (handRaised) return;
-    setHandRaised(true);
-    setParticipants((current) =>
-      current.map((p) => (p.id === 'you' ? { ...p, handRaised: true } : p))
-    );
-  };
-
-  const admitSpeaker = (participantId: string) => {
-    setParticipants((current) =>
-      current.map((p) =>
-        p.id !== participantId ? p : { ...p, role: 'speaker', handRaised: false, muted: false }
-      )
-    );
-  };
-
-  const muteParticipant = (participantId: string) => {
-    setParticipants((current) =>
-      current.map((p) => (p.id !== participantId ? p : { ...p, muted: !p.muted }))
-    );
-  };
-
-  const toggleShareAccess = (participantId: string) => {
-    setParticipants((current) =>
-      current.map((p) => {
-        if (p.id !== participantId) return p;
-        const nextCanShare = !p.canShareScreen;
-        return { ...p, canShareScreen: nextCanShare, sharingScreen: nextCanShare ? p.sharingScreen : false };
-      })
-    );
-    if (screenStreamOwnerId === participantId) {
-      screenStream?.getTracks().forEach((t) => t.stop());
-      setScreenStream(null);
-      setScreenStreamOwnerId(null);
-    }
-  };
-
-  const shareScreen = (participantId: string) => {
-    const participant = participants.find((p) => p.id === participantId);
-    if (!participant) return;
-
-    setParticipants((current) => {
-      const isCurrentlySharing = current.find((p) => p.id === participantId)?.sharingScreen;
-      if (isCurrentlySharing) {
-        return current.map((p) => (p.id === participantId ? { ...p, sharingScreen: false } : p));
-      }
-      const otherSharers = current.filter((p) => p.sharingScreen && p.id !== participantId);
-      let next = current;
-      if (otherSharers.length >= MAX_CONCURRENT_SCREEN_SHARES) {
-        const [oldest] = otherSharers;
-        next = next.map((p) => (p.id === oldest.id ? { ...p, sharingScreen: false } : p));
-      }
-      return next.map((p) =>
-        p.id === participantId ? { ...p, sharingScreen: true, role: 'speaker' } : p
-      );
-    });
-
-    setSpotlights((current) => [
-      ...current.filter((s) => s.id !== participant.id),
-      { id: participant.id, name: participant.name, skill: participant.skill, role: 'speaker' },
-    ]);
-  };
-
-  const stopStream = (ownerId: string) => {
-    screenStream?.getTracks().forEach((t) => t.stop());
-    setScreenStream(null);
-    setScreenStreamOwnerId(null);
-    setShareError(null);
-    setParticipants((current) =>
-      current.map((p) => (p.id === ownerId ? { ...p, sharingScreen: false } : p))
-    );
-  };
-
-  const startStream = async (selfId: string) => {
-    if (typeof window === 'undefined' || !navigator.mediaDevices?.getDisplayMedia) {
-      setShareError('Screen sharing is not supported in this browser.');
-      return;
-    }
-    try {
-      const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
-      setScreenStream(stream);
-      setScreenStreamOwnerId(selfId);
-      setShareError(null);
-      setParticipants((current) =>
-        current.map((p) =>
-          p.id === selfId
-            ? { ...p, sharingScreen: true, role: p.role === 'viewer' ? 'speaker' : p.role }
-            : p
-        )
-      );
-      setMessages((current) => [
-        ...current,
-        {
-          id: `m-${Date.now()}`,
-          author: selfId === 'host' ? 'Devconnect team' : 'You',
-          text: 'You are now sharing your screen with the room.',
-          tone: selfId === 'host' ? 'admin' : 'user',
-        },
-      ]);
-    } catch {
-      setShareError('Screen share permission was denied or cancelled.');
-    }
-  };
-
-  const toggleSelfScreenShare = async (selfId: string, allowed: boolean) => {
-    if (!allowed) return;
-    if (screenStream) { stopStream(selfId); return; }
-    await startStream(selfId);
-  };
-
-  const toggleHostScreenShare = async () => {
-    if (screenStream) { stopStream(screenStreamOwnerId ?? 'host'); return; }
-    await startStream('host');
-  };
-
-  const toggleFullScreen = async () => {
-    if (typeof window === 'undefined') return;
-    if (!document.fullscreenElement) {
-      await document.documentElement.requestFullscreen();
-      setIsFullScreen(true);
-    } else {
-      await document.exitFullscreen();
-      setIsFullScreen(false);
-    }
-  };
-
-  const openPanel = (tab: RoomTab) => {
-    setActiveTab(tab);
-    setRoomPanelOpen(true);
-  };
-
-  const canSpeak = joined && micEnabled && !adminMuted;
-  const hostParticipant = participants.find((p) => p.id === 'host') ?? participants[0];
-  const screenSharers = participants.filter((p) => p.sharingScreen).slice(0, MAX_CONCURRENT_SCREEN_SHARES);
-  const nonHostSharers = screenSharers.filter((p) => p.id !== 'host');
-  const isFocusMode = nonHostSharers.length > 0;
-  const focusedSharers = isFocusMode ? screenSharers : [];
-
-  useEffect(() => {
-    setChromeHidden(isFocusMode);
-  }, [isFocusMode]);
-
-  const showChrome = !isFocusMode || !chromeHidden;
-  const selfParticipant = isAdmin ? hostParticipant : (participants.find((p) => p.id === 'you') ?? participants[1]);
-  const selfCanShare = !!selfParticipant && (selfParticipant.id === 'host' || selfParticipant.canShareScreen);
-  const selfIsSpeaker = selfParticipant?.role !== 'viewer';
-  const selfIsSharing = !!selfParticipant && screenStreamOwnerId === selfParticipant.id && !!screenStream;
-  const handRaisedCount = participants.filter((p) => p.handRaised).length;
-  const speakingCount = participants.filter((p) => p.role !== 'viewer').length;
-  const unreadMessages = Math.max(0, messages.length - lastReadCount);
-  const hostMicLabel = hostParticipant?.muted ? 'Mic muted' : canSpeak ? 'Mic live' : 'Mic muted';
-
-  const visibleParticipants = participants.filter((p) => {
-    if (queueFilter === 'raised') return p.handRaised;
-    if (queueFilter === 'speaking') return p.role !== 'viewer';
-    return true;
-  });
-
-  const SelfControls = () => {
-    if (!selfParticipant) return null;
+function AvatarBadge({ name, src, size = 'h-10 w-10' }: { name?: string; src?: string; size?: string }) {
+  const initial = (name?.trim()?.[0] ?? 'D').toUpperCase();
+  if (src) {
     return (
-      <Box className="flex flex-wrap gap-2">
-        {selfIsSpeaker ? (
-          <Button
-            onPress={toggleMic}
-            className={canSpeak ? 'rounded-full bg-slate-700 px-3 py-2' : 'rounded-full bg-emerald-600 px-3 py-2'}
+      <Avatar className={`${size} border border-slate-100 dark:border-slate-700`}>
+        <AvatarImage source={{ uri: src }} />
+      </Avatar>
+    );
+  }
+  return (
+    <Box
+      className={`${size} flex items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 dark:border-emerald-500/30 dark:bg-emerald-500/10`}
+    >
+      <Text className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">{initial}</Text>
+    </Box>
+  );
+}
+
+function ChannelChip({ channelName }: { channelName: string }) {
+  return (
+    <span className="rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 font-mono text-[10px] text-slate-500 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-500">
+      #{channelName}
+    </span>
+  );
+}
+
+function HangoutCardSkeleton() {
+  return (
+    <Card className="w-full overflow-hidden rounded-2xl border border-slate-100 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+      <Box className="flex-row items-center gap-3">
+        <Box className="h-10 w-10 animate-pulse rounded-full bg-slate-200 dark:bg-slate-800" />
+        <Box className="flex-1 gap-2">
+          <Box className="h-3 w-1/3 animate-pulse rounded-full bg-slate-200 dark:bg-slate-800" />
+          <Box className="h-2.5 w-1/2 animate-pulse rounded-full bg-slate-200 dark:bg-slate-800" />
+        </Box>
+      </Box>
+      <Box className="mt-4 h-4 w-3/4 animate-pulse rounded-full bg-slate-200 dark:bg-slate-800" />
+      <Box className="mt-3 h-8 w-28 animate-pulse rounded-full bg-slate-200 dark:bg-slate-800" />
+    </Card>
+  );
+}
+
+function StatusPill({ status, scheduledAt, now }: { status: HangoutData['status']; scheduledAt: string; now: number }) {
+  if (status === 'Live') {
+    return (
+      <Box className="flex-row items-center gap-1.5 rounded-full bg-rose-50 px-2.5 py-1 dark:bg-rose-500/10">
+        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-rose-500" />
+        <Text className="text-[11px] font-semibold text-rose-600 dark:text-rose-400">Live now</Text>
+      </Box>
+    );
+  }
+  if (status === 'Upcoming') {
+    const diff = new Date(scheduledAt).getTime() - now;
+    return (
+      <Box className="rounded-full bg-emerald-50 px-2.5 py-1 dark:bg-emerald-500/10">
+        <Text className="font-mono text-[11px] font-semibold text-emerald-700 dark:text-emerald-300">
+          {diff > 0 ? `starts in ${formatDuration(diff)}` : 'starting now'}
+        </Text>
+      </Box>
+    );
+  }
+  return (
+    <Box className="rounded-full bg-slate-100 px-2.5 py-1 dark:bg-slate-800">
+      <Text className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Ended</Text>
+    </Box>
+  );
+}
+
+function HangoutCard({
+  hangout,
+  now,
+  onOpen,
+}: {
+  hangout: HangoutData;
+  now: number;
+  onOpen: (id: string, channelName: string) => void;
+}) {
+  const isEnded = hangout.status === 'Ended';
+  const ctaLabel = hangout.status === 'Live' ? 'Join live' : hangout.status === 'Upcoming' ? 'View details' : 'View recap';
+
+  const edgeClass =
+    hangout.status === 'Live'
+      ? 'border-l-rose-400 dark:border-l-rose-500'
+      : hangout.status === 'Upcoming'
+        ? 'border-l-emerald-400 dark:border-l-emerald-500'
+        : 'border-l-slate-200 dark:border-l-slate-700';
+
+  return (
+    <Card
+      className={`w-full rounded-2xl border border-l-4 p-4 transition hover:-translate-y-0.5 ${edgeClass} ${
+        hangout.status === 'Live'
+          ? 'border-rose-100 bg-white shadow-sm shadow-rose-100 dark:border-rose-500/20 dark:bg-slate-900 dark:shadow-none'
+          : 'border-slate-100 bg-white dark:border-slate-800 dark:bg-slate-900'
+      } ${isEnded ? 'opacity-80' : ''}`}
+    >
+      <Box className="flex-row items-center justify-between gap-3">
+        <Box className="flex-row items-center gap-3">
+          <AvatarBadge name={hangout.host?.username} src={hangout.host?.profilePic} />
+          <Box>
+            <Text className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+              {hangout.host?.username ?? 'DevConnect team'}
+            </Text>
+            <Text className="text-xs text-slate-400 dark:text-slate-500">Host</Text>
+          </Box>
+        </Box>
+        <StatusPill status={hangout.status} scheduledAt={hangout.scheduledAt} now={now} />
+      </Box>
+
+      <Text className="mt-4 text-base font-semibold leading-snug text-slate-900 dark:text-slate-100">
+        {hangout.topic}
+      </Text>
+
+      {/* <Box className="mt-2.5 flex-row items-center gap-2">
+        <ChannelChip channelName={hangout.channelName} />
+      </Box> */}
+
+      <Box className="mt-4 flex-row items-center justify-between gap-3">
+        <Box className="flex-row items-center gap-1.5 text-slate-400 dark:text-slate-500">
+          <CalendarIcon className="h-3.5 w-3.5" />
+          <Text className="text-xs text-slate-400 dark:text-slate-500">
+            {new Date(hangout.scheduledAt).toLocaleString('en-NG', {
+              month: 'short',
+              day: 'numeric',
+              hour: 'numeric',
+              minute: '2-digit',
+            })}
+          </Text>
+        </Box>
+        <Button
+          onPress={() => onOpen(hangout._id, hangout.channelName)}
+          className={
+            hangout.status === 'Live'
+              ? 'rounded-full bg-rose-500 px-4 py-2'
+              : hangout.status === 'Upcoming'
+                ? 'rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 dark:border-emerald-500/30 dark:bg-emerald-500/10'
+                : 'rounded-full border border-slate-200 bg-slate-50 px-4 py-2 dark:border-slate-700 dark:bg-slate-800'
+          }
+        >
+          <ButtonText
+            className={
+              hangout.status === 'Live'
+                ? 'text-xs font-semibold text-white'
+                : hangout.status === 'Upcoming'
+                  ? 'text-xs font-semibold text-emerald-700 dark:text-emerald-300'
+                  : 'text-xs font-semibold text-slate-500 dark:text-slate-400'
+            }
           >
-            <ButtonText className="text-sm font-semibold text-white">
-              {micEnabled ? 'Turn mic off' : 'Turn mic on'}
-            </ButtonText>
-          </Button>
-        ) : (
-          <Button
-            onPress={raiseHandNow}
-            className={handRaised ? 'rounded-full border border-amber-500/40 bg-amber-500/10 px-3 py-2' : 'rounded-full bg-emerald-600 px-3 py-2'}
-          >
-            <ButtonText className="text-sm font-semibold text-white">
-              {handRaised ? 'Hand raised' : 'Raise hand to speak'}
-            </ButtonText>
-          </Button>
-        )}
-        {selfCanShare ? (
-          <Button
-            onPress={() => toggleSelfScreenShare(selfParticipant.id, selfCanShare)}
-            className={screenStream ? 'rounded-full border border-emerald-500/40 bg-emerald-500/15 px-3 py-2' : 'rounded-full border border-slate-700 bg-slate-900 px-3 py-2'}
-          >
-            <ButtonText className="text-sm font-semibold text-white">
-              {selfIsSharing ? 'Stop sharing' : 'Share my screen'}
-            </ButtonText>
-          </Button>
-        ) : null}
-        <Button onPress={toggleFullScreen} className="rounded-full border border-slate-700 bg-slate-900 px-3 py-2">
-          <ButtonText className="text-sm font-semibold text-white">
-            {isFullScreen ? 'Exit full screen' : 'Full screen'}
+            {ctaLabel}
           </ButtonText>
         </Button>
       </Box>
-    );
+    </Card>
+  );
+}
+
+export default function HangoutListPage() {
+  const [hangoutData, setHangoutData] = useState<HangoutData[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [activeTab, setActiveTab] = useState<StatusFilter>('Live');
+  const [now, setNow] = useState(() => Date.now());
+  const toast = useToast();
+  const router = useRouter();
+
+  const showToast = (title: string, message: string, action: 'success' | 'error') => {
+    toast.show({
+      render: ({ id }) => (
+        <Toast
+          key={id}
+          action={action}
+          className={`rounded-2xl border p-4 text-white shadow-2xl backdrop-blur-xl transition-all ${
+            action === 'success'
+              ? 'border-emerald-500/40 bg-emerald-950/75 shadow-emerald-950/20'
+              : 'border-red-500/40 bg-red-950/75 shadow-red-950/20'
+          }`}
+        >
+          <ToastTitle className={`text-sm font-semibold ${action === 'success' ? 'text-emerald-400' : 'text-red-400'}`}>
+            {title}
+          </ToastTitle>
+          <ToastDescription className="text-xs opacity-90">{message}</ToastDescription>
+        </Toast>
+      ),
+      placement: 'top',
+      duration: 5000,
+    });
   };
 
-  const renderSharerTile = (sharer: Participant, sizeClassName: string) => (
-    <Box key={sharer.id} className={`flex flex-col rounded-[1.5rem] border border-emerald-500/30 bg-slate-900/70 p-4 ${sizeClassName}`}>
-      <Box className="flex items-center justify-between gap-2">
-        <Text className="text-sm font-semibold text-white">{sharer.name}&rsquo;s screen</Text>
-        <Box className="rounded-full bg-emerald-500/15 px-2.5 py-1">
-          <Text className="text-[11px] uppercase tracking-[0.2em] text-emerald-300">Focused</Text>
-        </Box>
-      </Box>
-      {sharer.id === screenStreamOwnerId && screenStream ? (
-        <video ref={screenVideoRef} autoPlay playsInline muted className="mt-3 min-h-0 w-full flex-1 rounded-[1.1rem] object-cover" />
-      ) : (
-        <Box className="mt-3 flex min-h-0 flex-1 items-center justify-center rounded-[1.1rem] border border-dashed border-slate-700 bg-slate-950/70 p-4 text-center">
-          <Text className="text-sm text-slate-300">
-            {sharer.name} is sharing a coding screen, challenge board, and terminal output.
-          </Text>
-        </Box>
-      )}
-    </Box>
-  );
+  const redirectToCreateHangout = () => router.push('/hangout/create');
+  const openHangout = (id: string, channelName: string) =>
+    router.push(`/hangout/${id}?channelName=${encodeURIComponent(channelName)}`);
+
+  const handleFetchCurrentUser = async () => {
+    const token = getToken();
+    if (!token) return;
+    try {
+      const response = await fetch(`${apiBaseUrl}/api/auth/current-user`, {
+        method: 'GET',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!response.ok) return;
+      const data = await response.json();
+      const user = data?.user ?? data;
+      setIsAdmin(user.isAdmin ?? false);
+    } catch (error) {
+      console.error('Error fetching current user:', error);
+    }
+  };
+
+  const handleFetchHangoutData = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch(hangoutEndpoint, { method: 'GET' });
+      const data = await response.json();
+
+      if (!response.ok) {
+        showToast('Error', data.message || 'Failed to fetch hangouts.', 'error');
+        return;
+      }
+
+      const list = Array.isArray(data) ? data : (data.hangouts ?? []);
+      setHangoutData(list);
+    } catch (error) {
+      console.error('Error fetching hangout data:', error);
+      showToast('Error', 'An error occurred while fetching hangouts.', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    handleFetchHangoutData();
+    handleFetchCurrentUser();
+  }, []);
+
+  useEffect(() => {
+    const interval = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const grouped = useMemo(() => {
+    const live = hangoutData.filter((h) => h.status === 'Live');
+    const upcoming = [...hangoutData.filter((h) => h.status === 'Upcoming')].sort(
+      (a, b) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime()
+    );
+    const ended = [...hangoutData.filter((h) => h.status === 'Ended')].sort(
+      (a, b) => new Date(b.endedAt ?? b.scheduledAt).getTime() - new Date(a.endedAt ?? a.scheduledAt).getTime()
+    );
+    return { Live: live, Upcoming: upcoming, Ended: ended };
+  }, [hangoutData]);
+
+  useEffect(() => {
+    if (loading) return;
+    if (grouped.Live.length > 0) setActiveTab('Live');
+    else if (grouped.Upcoming.length > 0) setActiveTab('Upcoming');
+    else setActiveTab('Ended');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading]);
+
+  const tabs: { key: StatusFilter; label: string; count: number }[] = [
+    { key: 'Live', label: 'Live', count: grouped.Live.length },
+    { key: 'Upcoming', label: 'Upcoming', count: grouped.Upcoming.length },
+    { key: 'Ended', label: 'Ended', count: grouped.Ended.length },
+  ];
+
+  const visible = grouped[activeTab];
+
+  const emptyCopy: Record<StatusFilter, { title: string; body: string }> = {
+    Live: { title: 'No active channels right now', body: 'When a hangout goes live, it shows up here for everyone to join.' },
+    Upcoming: {
+      title: 'Nothing on the schedule',
+      body: isAdmin ? 'Create one and it will appear here with a countdown.' : 'Check back soon — new hangouts get scheduled regularly.',
+    },
+    Ended: { title: 'No past hangouts yet', body: 'Recordings and recaps will show up here once a hangout wraps.' },
+  };
 
   return (
-    <Box className="min-h-screen bg-slate-950 text-slate-100">
-      <Box className={`mx-auto flex max-w-[1700px] flex-col gap-4 ${isFocusMode && chromeHidden ? 'p-2' : 'p-3 md:p-5'}`}>
+    <Box className="min-h-screen bg-slate-50 px-4 py-6 text-slate-900 dark:bg-slate-950 dark:text-slate-100 md:px-8 md:py-10">
+      <Box className="mx-auto flex w-full max-w-5xl flex-col gap-6">
+        {/* Hero */}
+        <Card className="relative overflow-hidden rounded-3xl border border-slate-800 bg-slate-900 p-6 text-white shadow-xl md:p-8">
+          <DotGrid className="text-emerald-400" />
+          <Box className="absolute -right-16 -top-16 h-56 w-56 rounded-full bg-emerald-500/10 blur-3xl" />
 
-        {/* ── Pre-live header bar ── */}
-        {!isLive ? (
-          <Box className="flex flex-col gap-4 rounded-3xl border border-slate-800 bg-slate-900/80 p-5 shadow-2xl shadow-slate-950/50 md:flex-row md:items-center md:justify-between">
-            <Box>
-              <Text className="text-sm uppercase tracking-[0.3em] text-emerald-400">Live hangout</Text>
-              <Text className="mt-1 text-lg font-semibold text-white md:text-3xl">Developer showdown room</Text>
-              <Text className="mt-2 max-w-2xl text-sm text-slate-400">
-                Live hangout to watch developers compete in real time, share ideas, and discuss solutions.
+          <Box className="relative z-10 flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
+            <Box className="max-w-xl">
+              <Box className="inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-400">
+                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
+                Live Audio &amp; Video Hub
+              </Box>
+              <Text className="mt-3 text-2xl font-bold leading-snug text-white md:text-3xl">
+                Connect, learn, and build with developers live
               </Text>
+              <Text className="mt-1 text-xs text-slate-400 md:text-sm">
+                Join active channels, participate in discussions, or tune into scheduled streams.
+              </Text>
+
+              <Box className="mt-5 flex-row flex-wrap gap-2">
+                <StatChip value={grouped.Live.length} label="live now" tone="rose" />
+                <StatChip value={grouped.Upcoming.length} label="upcoming" tone="emerald" />
+              </Box>
             </Box>
-            <Box className="flex flex-col gap-2 md:items-end">
+
+            {isAdmin ? (
               <Button
-                onPress={handleJoinHangout}
-                className={joined ? 'rounded-full bg-slate-700 px-4 py-2' : 'rounded-full bg-emerald-600 px-4 py-2'}
+                onPress={redirectToCreateHangout}
+                className="flex-row items-center gap-1.5 self-start rounded-full bg-emerald-500 px-5 py-3 transition hover:bg-emerald-400 md:self-auto"
               >
-                <ButtonText className="text-sm font-semibold text-white">
-                  {joined ? 'Joined to this hangout' : 'Join hangout'}
-                </ButtonText>
+                <PlusIcon className="h-3.5 w-3.5 text-slate-950" />
+                <ButtonText className="text-xs font-bold text-slate-950">Schedule session</ButtonText>
               </Button>
-              <Box className="flex gap-2">
-                <Button onPress={() => setIsLive((c) => !c)} className="rounded-full border border-slate-700 bg-slate-900 px-4 py-2">
-                  <ButtonText className="text-sm font-semibold text-slate-200">
-                    {isLive ? 'Live room' : 'Upcoming room'}
-                  </ButtonText>
-                </Button>
-                <Button onPress={() => setIsAdmin((c) => !c)} className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-4 py-2">
-                  <ButtonText className="text-sm font-semibold text-emerald-300">
-                    {isAdmin ? 'Admin view' : 'Viewer view'}
-                  </ButtonText>
-                </Button>
-              </Box>
-            </Box>
-          </Box>
-        ) : null}
-
-        {/* ── Gate: must join first ── */}
-        {!joined ? (
-          <Card className="rounded-3xl border border-slate-800 bg-slate-900/70 p-6">
-            <Text className="text-xl font-semibold text-white">Join first to unlock the room</Text>
-            <Button onPress={handleJoinHangout} className="mt-4 rounded-full bg-emerald-600 px-4 py-2">
-              <ButtonText className="text-sm font-semibold text-white">Join now</ButtonText>
-            </Button>
-          </Card>
-
-        ) : !isLive ? (
-          /* ── Joined but not yet live ── */
-          <Card className="rounded-3xl border border-slate-800 bg-slate-900/70 p-6">
-            <Text className="mt-2 text-sm text-slate-400">
-              The room is not live yet. Full access will be available once streaming starts.
-            </Text>
-            <Box className="mt-4 rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
-              <Text className="text-sm font-semibold text-emerald-300">Topic</Text>
-              <Text className="mt-1 text-lg font-semibold text-white">Building a better developer community in Nigeria</Text>
-              <Text className="mt-2 text-sm text-slate-400">Starting soon</Text>
-            </Box>
-          </Card>
-
-        ) : (
-          /* ── Joined + Live ── */
-          <Box className="flex flex-col gap-3">
-
-            {/* Top bar */}
-            {showChrome ? (
-              <Box className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-800 bg-slate-900/70 px-4 py-3">
-                <Box className="flex items-center gap-3">
-                  <Box className="rounded-full bg-rose-500/20 px-3 py-1">
-                    <Text className="text-xs font-semibold uppercase tracking-[0.25em] text-rose-300">Live</Text>
-                  </Box>
-                  <Text className="text-sm text-slate-400">
-                    {screenSharers.length > 0 ? `${screenSharers.length} sharing screen` : 'No one sharing a screen yet'}
-                  </Text>
-                </Box>
-                <Box className="flex flex-wrap items-center gap-2">
-                  {isAdmin ? (
-                    <Button onPress={() => setAdminMuted((c) => !c)} className="rounded-full border border-slate-700 bg-slate-950 px-3 py-2">
-                      <ButtonText className="text-sm font-semibold text-slate-200">
-                        {adminMuted ? 'Unmute room' : 'Mute room'}
-                      </ButtonText>
-                    </Button>
-                  ) : null}
-                  <Button onPress={() => setIsAdmin((c) => !c)} className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-2">
-                    <ButtonText className="text-sm font-semibold text-emerald-300">
-                      {isAdmin ? 'Admin controls' : 'Viewer controls'}
-                    </ButtonText>
-                  </Button>
-                  {isFocusMode ? (
-                    <Button onPress={() => setChromeHidden(true)} className="rounded-full border border-slate-700 bg-slate-950 px-3 py-2">
-                      <ButtonText className="text-sm font-semibold text-slate-300">Hide, show screens only</ButtonText>
-                    </Button>
-                  ) : null}
-                </Box>
-              </Box>
-            ) : (
-              <Box className="flex justify-center">
-                <Button onPress={() => setChromeHidden(false)} className="flex items-center gap-1.5 rounded-full border border-slate-800 bg-slate-900/80 px-3 py-1.5">
-                  <Box className="flex items-center gap-1.5 text-slate-300">
-                    <ChevronDownIcon />
-                    <ButtonText className="text-xs font-semibold text-slate-300">Show room controls</ButtonText>
-                  </Box>
-                </Button>
-              </Box>
-            )}
-
-            {/* Your status bar */}
-            {showChrome ? (
-              <Box className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-800 bg-slate-900/70 px-4 py-3">
-                <Box>
-                  <Text className="text-sm font-semibold text-white">Your status</Text>
-                  <Text className="text-xs text-slate-400">
-                    {isAdmin
-                      ? 'You are hosting this room.'
-                      : selfIsSpeaker
-                        ? 'You are live — the admin can mute you at any time.'
-                        : handRaised
-                          ? 'Hand raised — waiting for the admin to bring you up.'
-                          : 'You are watching. Raise your hand to ask to speak.'}
-                  </Text>
-                </Box>
-                {!isAdmin ? <SelfControls /> : null}
-              </Box>
             ) : null}
+          </Box>
+        </Card>
 
-            {/* Stage */}
-            {isFocusMode ? (
-              <Box className={`flex flex-col gap-3 ${showChrome ? 'lg:h-[calc(100vh-250px)]' : 'lg:h-[calc(100vh-70px)]'}`}>
-                <Box className={`flex flex-1 gap-3 ${focusedSharers.length > 1 ? 'lg:grid lg:grid-cols-2' : ''}`}>
-                  {focusedSharers.map((sharer) => renderSharerTile(sharer, 'min-h-[420px] flex-1 lg:h-full'))}
-                </Box>
-                {showChrome && isAdmin ? (
-                  <Box className="flex flex-col gap-3 rounded-[1.25rem] border border-slate-800 bg-slate-900/70 p-3 sm:flex-row sm:items-center">
-                    <Box className="flex min-w-0 flex-1 items-center gap-3">
-                      <Box className="flex h-14 w-20 shrink-0 items-center justify-center rounded-xl border border-dashed border-slate-700 bg-slate-950/70 px-1">
-                        <Text className="text-center text-[10px] leading-tight text-slate-400">{hostParticipant?.name}</Text>
-                      </Box>
-                      <Box className="min-w-0">
-                        <Text className="truncate text-sm font-semibold text-white">{hostParticipant?.name}</Text>
-                        <Text className="text-xs text-slate-400">{hostMicLabel}</Text>
-                      </Box>
-                    </Box>
-                    <SelfControls />
-                  </Box>
-                ) : null}
-              </Box>
-            ) : (
-              <Box className="grid gap-3 lg:h-[calc(100vh-250px)] lg:grid-cols-3">
-                {/* Host tile */}
-                <Box className="flex min-h-[360px] flex-col justify-between gap-4 rounded-[1.5rem] border border-slate-800 bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.24),_transparent_60%),linear-gradient(135deg,_rgba(30,41,59,0.98),_rgba(2,6,23,0.98))] p-5 lg:h-full">
-                  <Box className="flex items-start justify-between">
-                    <Box>
-                      <Text className="text-lg font-semibold text-white">{hostParticipant?.name}</Text>
-                      <Text className="text-sm text-slate-300">{hostParticipant?.skill}</Text>
-                    </Box>
-                    <Box className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1">
-                      <Text className="text-sm font-medium text-emerald-300">{hostMicLabel}</Text>
-                    </Box>
-                  </Box>
-                  <Box className="flex flex-1 items-center justify-center rounded-[1.1rem] border border-dashed border-slate-700 bg-slate-950/70 p-4 text-center">
-                    {screenStreamOwnerId === 'host' && screenStream ? (
-                      <video ref={screenVideoRef} autoPlay playsInline muted className="h-full w-full rounded-[1.1rem] object-cover" />
-                    ) : (
-                      <Text className="text-sm text-slate-300">{hostParticipant?.name} is live on camera and ready to speak.</Text>
-                    )}
-                  </Box>
-                  {isAdmin ? <SelfControls /> : null}
-                </Box>
+        {/* Tabs */}
+        <Box className="inline-flex w-fit flex-row gap-1 rounded-full border border-slate-200 bg-white p-1 dark:border-slate-800 dark:bg-slate-900">
+          {tabs.map((tab) => (
+            <button
+              key={tab.key}
+              type="button"
+              onClick={() => setActiveTab(tab.key)}
+              className={`flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-semibold transition ${
+                activeTab === tab.key
+                  ? 'bg-emerald-500 text-slate-950'
+                  : 'text-slate-500 hover:text-emerald-600 dark:text-slate-400 dark:hover:text-emerald-300'
+              }`}
+            >
+              <SignalIcon className="h-3 w-3" />
+              {tab.label}
+              <span
+                className={`font-mono text-[10px] ${
+                  activeTab === tab.key ? 'text-slate-950/70' : 'text-slate-400 dark:text-slate-500'
+                }`}
+              >
+                {tab.count}
+              </span>
+            </button>
+          ))}
+        </Box>
 
-                {/* Screen share slot 1 */}
-                <Box className="flex min-h-[360px] flex-col rounded-[1.5rem] border border-slate-700 bg-slate-900/70 p-4 lg:h-full">
-                  <Text className="text-xs uppercase tracking-[0.25em] text-slate-400">
-                    {screenSharers[0] ? `${screenSharers[0].name}'s screen` : 'Screen share slot 1'}
-                  </Text>
-                  <Box className="mt-3 flex min-h-0 flex-1 items-center justify-center rounded-[1.1rem] border border-dashed border-slate-700 bg-slate-950/70 p-4 text-center">
-                    <Text className="text-sm text-slate-400">
-                      {screenSharers[0]?.name ? `${screenSharers[0].name} is sharing their screen.` : 'Waiting for a challenger to share their screen.'}
-                    </Text>
-                  </Box>
-                </Box>
-
-                {/* Screen share slot 2 */}
-                <Box className="flex min-h-[360px] flex-col rounded-[1.5rem] border border-slate-700 bg-slate-900/70 p-4 lg:h-full">
-                  <Text className="text-xs uppercase tracking-[0.25em] text-slate-400">
-                    {screenSharers[1] ? `${screenSharers[1].name}'s screen` : 'Screen share slot 2'}
-                  </Text>
-                  <Box className="mt-3 flex min-h-0 flex-1 items-center justify-center rounded-[1.1rem] border border-dashed border-slate-700 bg-slate-950/70 p-4 text-center">
-                    <Text className="text-sm text-slate-400">
-                      {screenSharers[1]?.name ? `${screenSharers[1].name} is sharing their screen.` : 'Waiting for a second challenger to share their screen.'}
-                    </Text>
-                  </Box>
-                </Box>
-              </Box>
-            )}
-
-            {shareError ? <Text className="text-sm text-amber-300">{shareError}</Text> : null}
+        {/* List */}
+        {loading ? (
+          <Box className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <HangoutCardSkeleton />
+            <HangoutCardSkeleton />
+          </Box>
+        ) : visible.length === 0 ? (
+          <Card className="flex flex-col items-center gap-3 rounded-3xl border border-slate-100 bg-white p-10 text-center dark:border-slate-800 dark:bg-slate-900">
+            <Box className="flex h-14 w-14 items-center justify-center rounded-full border border-dashed border-emerald-200 text-emerald-500 dark:border-emerald-500/30 dark:text-emerald-400">
+              <EmptyIllustration />
+            </Box>
+            <Text className="text-base font-semibold text-slate-900 dark:text-slate-100">{emptyCopy[activeTab].title}</Text>
+            <Text className="max-w-sm text-sm text-slate-500 dark:text-slate-400">{emptyCopy[activeTab].body}</Text>
+            {activeTab === 'Upcoming' && isAdmin ? (
+              <Button onPress={redirectToCreateHangout} className="mt-1 rounded-full bg-emerald-500 px-4 py-2">
+                <ButtonText className="text-sm font-semibold text-slate-950">Create hangout</ButtonText>
+              </Button>
+            ) : null}
+          </Card>
+        ) : (
+          <Box className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            {visible.map((hangout) => (
+              <HangoutCard key={hangout._id} hangout={hangout} now={now} onOpen={openHangout} />
+            ))}
           </Box>
         )}
-
-        {/* ── Floating Room button ── */}
-        {joined && isLive ? (
-          <Box className="fixed bottom-6 right-6 z-40 flex flex-col items-end gap-2">
-            <Button onPress={() => openPanel('chat')} className="relative rounded-full bg-emerald-600 px-5 py-3 shadow-2xl shadow-emerald-950/60">
-              <Box className="flex items-center gap-2 text-white">
-                <HamburgerIcon />
-                <ButtonText className="text-sm font-semibold text-white">Room</ButtonText>
-              </Box>
-              {unreadMessages > 0 ? (
-                <Box className="absolute -right-1.5 -top-1.5 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-rose-500 px-1">
-                  <Text className="text-[11px] font-bold text-white">{unreadMessages > 9 ? '9+' : unreadMessages}</Text>
-                </Box>
-              ) : null}
-            </Button>
-          </Box>
-        ) : null}
-
-        {/* ── Slide-out room drawer ── */}
-        {roomPanelOpen ? (
-          <Box className="fixed inset-0 z-50 flex justify-end">
-            <button onClick={() => setRoomPanelOpen(false)} className="absolute inset-0 bg-black/60" />
-            <Box className="relative z-10 flex h-full w-full max-w-md flex-col border-l border-slate-800 bg-slate-950 shadow-2xl">
-              <Box className="flex items-center justify-between border-b border-slate-800 p-4">
-                <Text className="text-lg font-semibold text-white">Room</Text>
-                <Button onPress={() => setRoomPanelOpen(false)} className="rounded-full border border-slate-700 bg-slate-900 p-2">
-                  <Box className="text-slate-200"><CloseIcon /></Box>
-                </Button>
-              </Box>
-
-              {/* Tabs */}
-              <Box className="flex gap-2 border-b border-slate-800 p-3">
-                {(
-                  [
-                    { key: 'chat', label: 'Chat' },
-                    { key: 'people', label: `People (${participants.length})` },
-                    { key: 'match', label: 'Challenge' },
-                  ] as { key: RoomTab; label: string }[]
-                ).map((tab) => (
-                  <Button
-                    key={tab.key}
-                    onPress={() => setActiveTab(tab.key)}
-                    className={activeTab === tab.key ? 'rounded-full bg-emerald-600 px-3 py-1.5' : 'rounded-full border border-slate-700 bg-slate-900 px-3 py-1.5'}
-                  >
-                    <ButtonText className="text-xs font-semibold text-white">{tab.label}</ButtonText>
-                  </Button>
-                ))}
-              </Box>
-
-              <Box className="flex-1 overflow-y-auto p-4">
-                {/* Chat tab */}
-                {activeTab === 'chat' ? (
-                  <Box className="flex h-full flex-col gap-3">
-                    <Box className="flex flex-1 flex-col gap-2 overflow-y-auto rounded-2xl border border-slate-800 bg-slate-900/70 p-3">
-                      {messages.map((message) => (
-                        <Box key={message.id} className="rounded-xl border border-slate-800 bg-slate-950/70 px-3 py-2">
-                          <Text className="text-xs uppercase tracking-[0.24em] text-emerald-400">{message.author}</Text>
-                          <Text className="mt-1 text-sm text-slate-200">{message.text}</Text>
-                        </Box>
-                      ))}
-                    </Box>
-                    <form onSubmit={handleSendMessage} className="flex flex-col gap-2">
-                      <input
-                        value={draft}
-                        onChange={(e) => setDraft(e.target.value)}
-                        placeholder="Write in the live stream"
-                        className="rounded-2xl border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 outline-none"
-                      />
-                      <button type="submit" className="rounded-full bg-emerald-600 px-3 py-2 text-sm font-semibold text-white">
-                        Send
-                      </button>
-                    </form>
-                  </Box>
-                ) : null}
-
-                {/* People tab */}
-                {activeTab === 'people' ? (
-                  <Box className="flex flex-col gap-3">
-                    <Text className="text-sm text-slate-400">
-                      {participants.length} in the room &bull; {handRaisedCount} hand{handRaisedCount === 1 ? '' : 's'} raised &bull; {speakingCount} on stage
-                    </Text>
-                    <Box className="flex flex-wrap gap-2">
-                      {(
-                        [
-                          { key: 'all', label: `All (${participants.length})` },
-                          { key: 'raised', label: `Hands raised (${handRaisedCount})` },
-                          { key: 'speaking', label: `On stage (${speakingCount})` },
-                        ] as { key: QueueFilter; label: string }[]
-                      ).map((filter) => (
-                        <Button
-                          key={filter.key}
-                          onPress={() => setQueueFilter(filter.key)}
-                          className={queueFilter === filter.key ? 'rounded-full bg-emerald-600 px-3 py-1.5' : 'rounded-full border border-slate-700 bg-slate-900 px-3 py-1.5'}
-                        >
-                          <ButtonText className="text-xs font-semibold text-white">{filter.label}</ButtonText>
-                        </Button>
-                      ))}
-                    </Box>
-                    <Box className="flex flex-col gap-2">
-                      {visibleParticipants.length === 0 ? (
-                        <Box className="p-4 text-center">
-                          <Text className="text-sm text-slate-400">No one matches this filter right now.</Text>
-                        </Box>
-                      ) : (
-                        visibleParticipants.map((participant) => (
-                          <Box key={participant.id} className="rounded-2xl border border-slate-800 bg-slate-900/70 p-3">
-                            <Box className="flex items-center justify-between gap-2">
-                              <Box>
-                                <Text className="font-semibold text-white">{participant.name}</Text>
-                                <Text className="text-sm text-slate-400">{participant.skill}</Text>
-                              </Box>
-                              <Box className="rounded-full border border-slate-700 bg-slate-950 px-2.5 py-1">
-                                <Text className="text-[11px] uppercase tracking-[0.25em] text-slate-300">{participant.role}</Text>
-                              </Box>
-                            </Box>
-                            <Box className="mt-3 flex flex-wrap gap-2">
-                              {isAdmin ? (
-                                participant.id === 'host' ? (
-                                  <Box className="rounded-full border border-slate-700 bg-slate-950 px-3 py-2">
-                                    <Text className="text-sm text-slate-400">This is you (host)</Text>
-                                  </Box>
-                                ) : (
-                                  <>
-                                    <Button onPress={() => admitSpeaker(participant.id)} className="rounded-full bg-emerald-600 px-3 py-2">
-                                      <ButtonText className="text-sm font-semibold text-white">Bring up</ButtonText>
-                                    </Button>
-                                    <Button onPress={() => muteParticipant(participant.id)} className="rounded-full border border-slate-700 bg-slate-950 px-3 py-2">
-                                      <ButtonText className="text-sm font-semibold text-slate-200">{participant.muted ? 'Unmute' : 'Mute'}</ButtonText>
-                                    </Button>
-                                    <Button onPress={() => shareScreen(participant.id)} className="rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-2">
-                                      <ButtonText className="text-sm font-semibold text-amber-300">
-                                        {participant.sharingScreen ? 'Stop screen' : 'Share screen'}
-                                      </ButtonText>
-                                    </Button>
-                                  </>
-                                )
-                              ) : (
-                                <Box className="rounded-full border border-slate-700 bg-slate-950 px-3 py-2">
-                                  <Text className="text-sm text-slate-300">{participant.handRaised ? 'Requested to speak' : 'Watching'}</Text>
-                                </Box>
-                              )}
-                            </Box>
-                          </Box>
-                        ))
-                      )}
-                    </Box>
-                  </Box>
-                ) : null}
-
-                {/* Match/Challenge tab */}
-                {activeTab === 'match' ? (
-                  <Box className="flex flex-col gap-3">
-                    <Text className="text-sm text-slate-400">
-                      Admin can bring up matching challengers and let them share their screen while the audience watches the competition unfold.
-                    </Text>
-                    {spotlights.map((spotlight) => (
-                      <Box key={spotlight.id} className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
-                        <Text className="font-semibold text-white">{spotlight.name}</Text>
-                        <Text className="mt-1 text-sm text-slate-400">{spotlight.skill}</Text>
-                        <Text className="mt-2 text-xs uppercase tracking-[0.24em] text-amber-400">{spotlight.role}</Text>
-                      </Box>
-                    ))}
-                  </Box>
-                ) : null}
-              </Box>
-            </Box>
-          </Box>
-        ) : null}
-
       </Box>
     </Box>
   );
