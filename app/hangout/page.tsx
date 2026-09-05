@@ -32,7 +32,6 @@ interface HangoutData {
   createdAt: string;
   updatedAt: string;
 }
-
 type StatusFilter = 'Live' | 'Upcoming' | 'Ended';
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, '');
@@ -145,8 +144,6 @@ function AvatarBadge({ name, src, size = 'h-10 w-10' }: { name?: string; src?: s
     </Box>
   );
 }
-
-
 
 function HangoutCardSkeleton() {
   return (
