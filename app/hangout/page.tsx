@@ -146,13 +146,7 @@ function AvatarBadge({ name, src, size = 'h-10 w-10' }: { name?: string; src?: s
   );
 }
 
-function ChannelChip({ channelName }: { channelName: string }) {
-  return (
-    <span className="rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 font-mono text-[10px] text-slate-500 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-500">
-      #{channelName}
-    </span>
-  );
-}
+
 
 function HangoutCardSkeleton() {
   return (
@@ -206,21 +200,21 @@ function HangoutCard({
   onOpen: (id: string, channelName: string) => void;
 }) {
   const isEnded = hangout.status === 'Ended';
-  const ctaLabel = hangout.status === 'Live' ? 'Join live' : hangout.status === 'Upcoming' ? 'View details' : 'View recap';
-
-  const edgeClass =
+  const ctaLabel =
     hangout.status === 'Live'
-      ? 'border-l-rose-400 dark:border-l-rose-500'
+      ? 'Join live'
       : hangout.status === 'Upcoming'
-        ? 'border-l-emerald-400 dark:border-l-emerald-500'
-        : 'border-l-slate-200 dark:border-l-slate-700';
+        ? 'View details'
+        : 'View recap';
+
+  const isLive = hangout.status === 'Live';
 
   return (
     <Card
-      className={`w-full rounded-2xl border border-l-4 p-4 transition hover:-translate-y-0.5 ${edgeClass} ${
-        hangout.status === 'Live'
-          ? 'border-rose-100 bg-white shadow-sm shadow-rose-100 dark:border-rose-500/20 dark:bg-slate-900 dark:shadow-none'
-          : 'border-slate-100 bg-white dark:border-slate-800 dark:bg-slate-900'
+      className={`w-full rounded-2xl bg-white p-4 shadow-md shadow-slate-200/50 transition hover:-translate-y-0.5 dark:bg-slate-900 dark:shadow-none ${
+        isLive
+          ? 'border border-l-4 border-l-rose-200/100 dark:border-rose-500/20 dark:border-l-rose-500'
+          : 'border'
       } ${isEnded ? 'opacity-80' : ''}`}
     >
       <Box className="flex-row items-center justify-between gap-3">
@@ -239,10 +233,6 @@ function HangoutCard({
       <Text className="mt-4 text-base font-semibold leading-snug text-slate-900 dark:text-slate-100">
         {hangout.topic}
       </Text>
-
-      {/* <Box className="mt-2.5 flex-row items-center gap-2">
-        <ChannelChip channelName={hangout.channelName} />
-      </Box> */}
 
       <Box className="mt-4 flex-row items-center justify-between gap-3">
         <Box className="flex-row items-center gap-1.5 text-slate-400 dark:text-slate-500">
@@ -407,23 +397,18 @@ export default function HangoutListPage() {
     <Box className="min-h-screen bg-slate-50 px-4 py-6 text-slate-900 dark:bg-slate-950 dark:text-slate-100 md:px-8 md:py-10">
       <Box className="mx-auto flex w-full max-w-5xl flex-col gap-6">
         {/* Hero */}
-        <Card className="relative overflow-hidden rounded-3xl border border-slate-800 bg-slate-900 p-6 text-white shadow-xl md:p-8">
+        <Card className="relative w-full overflow-hidden border-none rounded-2xl bg-slate-900 p-6 text-white md:p-8">
           <DotGrid className="text-emerald-400" />
           <Box className="absolute -right-16 -top-16 h-56 w-56 rounded-full bg-emerald-500/10 blur-3xl" />
 
           <Box className="relative z-10 flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
             <Box className="max-w-xl">
-              <Box className="inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-400">
-                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
-                Live Audio &amp; Video Hub
-              </Box>
               <Text className="mt-3 text-2xl font-bold leading-snug text-white md:text-3xl">
-                Connect, learn, and build with developers live
+                DevConnect Hangouts
               </Text>
               <Text className="mt-1 text-xs text-slate-400 md:text-sm">
-                Join active channels, participate in discussions, or tune into scheduled streams.
+                Join live  Streams and experience the vibe, participate in discussions, or tune into scheduled streams.
               </Text>
-
               <Box className="mt-5 flex-row flex-wrap gap-2">
                 <StatChip value={grouped.Live.length} label="live now" tone="rose" />
                 <StatChip value={grouped.Upcoming.length} label="upcoming" tone="emerald" />
@@ -436,7 +421,7 @@ export default function HangoutListPage() {
                 className="flex-row items-center gap-1.5 self-start rounded-full bg-emerald-500 px-5 py-3 transition hover:bg-emerald-400 md:self-auto"
               >
                 <PlusIcon className="h-3.5 w-3.5 text-slate-950" />
-                <ButtonText className="text-xs font-bold text-slate-950">Schedule session</ButtonText>
+                <ButtonText className="text-xs font-bold text-slate-950">Schedule Hangout</ButtonText>
               </Button>
             ) : null}
           </Box>
@@ -475,15 +460,15 @@ export default function HangoutListPage() {
             <HangoutCardSkeleton />
           </Box>
         ) : visible.length === 0 ? (
-          <Card className="flex flex-col items-center gap-3 rounded-3xl border border-slate-100 bg-white p-10 text-center dark:border-slate-800 dark:bg-slate-900">
-            <Box className="flex h-14 w-14 items-center justify-center rounded-full border border-dashed border-emerald-200 text-emerald-500 dark:border-emerald-500/30 dark:text-emerald-400">
+          <Card className="flex flex-col items-center gap-3 rounded-3xl border bg-white p-10 text-center dark:border-slate-800 dark:bg-slate-900">
+            <Box className="flex h-14 w-14 items-center justify-center rounded-full border text-emerald-500 dark:border-emerald-500/30 dark:text-emerald-400">
               <EmptyIllustration />
             </Box>
             <Text className="text-base font-semibold text-slate-900 dark:text-slate-100">{emptyCopy[activeTab].title}</Text>
             <Text className="max-w-sm text-sm text-slate-500 dark:text-slate-400">{emptyCopy[activeTab].body}</Text>
             {activeTab === 'Upcoming' && isAdmin ? (
               <Button onPress={redirectToCreateHangout} className="mt-1 rounded-full bg-emerald-500 px-4 py-2">
-                <ButtonText className="text-sm font-semibold text-slate-950">Create hangout</ButtonText>
+                <ButtonText className="text-sm font-semibold text-slate-950">Create Hangout</ButtonText>
               </Button>
             ) : null}
           </Card>
