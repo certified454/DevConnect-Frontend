@@ -906,3 +906,4 @@ export default function HangoutRoomPage() {
       ) : null}
     </Box>
   );
+}
