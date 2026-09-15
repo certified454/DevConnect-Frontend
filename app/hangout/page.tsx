@@ -61,6 +61,10 @@ function formatDuration(ms: number): string {
   if (minutes > 0) return `${minutes}m ${seconds}s`;
   return `${seconds}s`;
 }
+type StatusFilter = 'Live' | 'Upcoming' | 'Ended';
+
+const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, '');
+const hangoutEndpoint = `${apiBaseUrl}/api/hangouts`;
 
 // ── Icons ──────────────────────────────────────────────────────────────
 function CalendarIcon({ className = 'h-4 w-4' }: { className?: string }) {
@@ -75,7 +79,107 @@ function PlusIcon({ className = 'h-4 w-4' }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" className={className}>
       <path d="M12 5v14M5 12h14" strokeLinecap="round" />
+function getToken(): string {
+  if (typeof window === 'undefined') return '';
+  return (
+    window.localStorage.getItem('authToken') ??
+    window.sessionStorage.getItem('authToken') ??
+    window.localStorage.getItem('token') ??
+    ''
+  );
+}
+
+function formatDuration(ms: number): string {
+  const abs = Math.max(0, Math.abs(ms));
+  const totalSeconds = Math.floor(abs / 1000);
+  const days = Math.floor(totalSeconds / 86400);
+  const hours = Math.floor((totalSeconds % 86400) / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+
+  if (days > 0) return `${days}d ${hours}h`;
+  if (hours > 0) return `${hours}h ${minutes}m`;
+  if (minutes > 0) return `${minutes}m ${seconds}s`;
+  return `${seconds}s`;
+}
+
+// ── Icons ──────────────────────────────────────────────────────────────
+function CalendarIcon({ className = 'h-4 w-4' }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className}>
+      <path d="M7 2a1 1 0 0 1 1 1v1h8V3a1 1 0 1 1 2 0v1h1a3 3 0 0 1 3 3v12a3 3 0 0 1-3 3H5a3 3 0 0 1-3-3V6a3 3 0 0 1 3-3h1V3a1 1 0 0 1 1-1Zm13 8H4v8a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-8Z" />
     </svg>
+  );
+};
+      
+function SignalIcon({ className = 'h-4 w-4' }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className}>
+      <path d="M4 15v4M9 11v8M14 7v12M19 4v15" strokeLinecap="round" />
+function PlusIcon({ className = 'h-4 w-4' }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" className={className}>
+      <path d="M12 5v14M5 12h14" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function EmptyIllustration({ className = 'h-9 w-9' }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className={className}>
+      <circle cx="12" cy="8" r="3.2" />
+      <path d="M4.5 20c1-3.4 4-5.4 7.5-5.4S18.5 16.6 19.5 20" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function DotGrid({ className = '' }: { className?: string }) {
+  return (
+    <div
+      className={`pointer-events-none absolute inset-0 opacity-[0.07] [background-image:radial-gradient(currentColor_1px,transparent_1px)] [background-size:20px_20px] ${className}`}
+    />
+  );
+}
+
+function StatChip({
+  value,
+  label,
+  tone,
+}: {
+  value: number;
+  label: string;
+  tone: 'rose' | 'emerald';
+}) {
+  const toneClasses =
+    tone === 'rose'
+      ? 'border-rose-400/30 bg-rose-500/10 text-rose-300'
+      : 'border-emerald-400/30 bg-emerald-500/10 text-emerald-300';
+  return (
+    <Box className={`flex-row items-center gap-1.5 rounded-full border px-3 py-1.5 ${toneClasses}`}>
+      {tone === 'rose' ? <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-rose-400" /> : null}
+      <Text className={`font-mono text-xs font-semibold ${tone === 'rose' ? 'text-rose-300' : 'text-emerald-300'}`}>
+        {value}
+      </Text>
+      <Text className={`text-xs ${tone === 'rose' ? 'text-rose-300/80' : 'text-emerald-300/80'}`}>{label}</Text>
+    </Box>
+  );
+}
+
+function AvatarBadge({ name, src, size = 'h-10 w-10' }: { name?: string; src?: string; size?: string }) {
+  const initial = (name?.trim()?.[0] ?? 'D').toUpperCase();
+  if (src) {
+    return (
+      <Avatar className={`${size} border border-slate-100 dark:border-slate-700`}>
+        <AvatarImage source={{ uri: src }} />
+      </Avatar>
+    );
+  }
+  return (
+    <Box
+      className={`${size} flex items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 dark:border-emerald-500/30 dark:bg-emerald-500/10`}
+    >
+      <Text className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">{initial}</Text>
+    </Box>
   );
 }
 
@@ -145,8 +249,6 @@ function AvatarBadge({ name, src, size = 'h-10 w-10' }: { name?: string; src?: s
     </Box>
   );
 }
-
-
 
 function HangoutCardSkeleton() {
   return (
@@ -409,6 +511,11 @@ export default function HangoutListPage() {
               <Text className="mt-1 text-xs text-slate-400 md:text-sm">
                 Join live  Streams and experience the vibe, participate in discussions, or tune into scheduled streams.
               </Text>
+              </Text>
+              <Text className="mt-1 text-xs text-slate-400 md:text-sm">
+                Join live  Streams and experience the vibe, participate in discussions, or tune into scheduled streams.
+              </Text>
+
               <Box className="mt-5 flex-row flex-wrap gap-2">
                 <StatChip value={grouped.Live.length} label="live now" tone="rose" />
                 <StatChip value={grouped.Upcoming.length} label="upcoming" tone="emerald" />
