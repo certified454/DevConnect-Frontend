@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 const apiBaseUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000').replace(/\/$/, '');
 
@@ -20,22 +20,31 @@ const programmingLanguages = [
   'sql',
 ];
 
-type ImageStatus = 'idle' | 'checking' | 'valid' | 'invalid';
-
 export default function CreateTopicPage() {
   const router = useRouter();
 
-  // Mongoose Model Fields & UI State
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [codeSnippet, setCodeSnippet] = useState('');
   const [language, setLanguage] = useState('');
-  const [imageUrl, setImageUrl] = useState('');
+  const [image, setImage] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState('');
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [imgStatus, setImgStatus] = useState<ImageStatus>('idle');
+
+  useEffect(() => {
+    if (!image) {
+      setImagePreview('');
+      return;
+    }
+
+    const objectUrl = URL.createObjectURL(image);
+    setImagePreview(objectUrl);
+
+    return () => URL.revokeObjectURL(objectUrl);
+  }, [image]);
 
   const addTag = (raw: string) => {
     const t = raw.trim();
@@ -46,8 +55,8 @@ export default function CreateTopicPage() {
     setTagInput('');
   };
 
-  const removeTag = (t: string) => {
-    setTags((s) => s.filter((x) => x !== t));
+  const removeTag = (tag: string) => {
+    setTags((s) => s.filter((item) => item !== tag));
   };
 
   const handleTagKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -57,28 +66,28 @@ export default function CreateTopicPage() {
     }
   };
 
-  const validateImageUrl = (url: string) => {
-    if (!url.trim()) {
-      setImgStatus('idle');
-      return;
-    }
-    let parsed: URL;
-    try {
-      parsed = new URL(url);
-    } catch {
-      setImgStatus('invalid');
-      return;
-    }
-    if (!['http:', 'https:'].includes(parsed.protocol)) {
-      setImgStatus('invalid');
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedImage = e.target.files?.[0];
+    if (!selectedImage) return;
+
+    if (!selectedImage.type.startsWith('image/')) {
+      setError('Please select a valid image file.');
+      e.target.value = '';
       return;
     }
 
-    setImgStatus('checking');
-    const img = new Image();
-    img.onload = () => setImgStatus('valid');
-    img.onerror = () => setImgStatus('invalid');
-    img.src = url;
+    if (selectedImage.size > 5 * 1024 * 1024) {
+      setError('Image must be smaller than 5 MB.');
+      e.target.value = '';
+      return;
+    }
+
+    setError(null);
+    setImage(selectedImage);
+  };
+
+  const removeImage = () => {
+    setImage(null);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -93,10 +102,6 @@ export default function CreateTopicPage() {
       setError('Post content cannot be empty.');
       return;
     }
-    if (imageUrl.trim() && imgStatus === 'invalid') {
-      setError("Please fix or remove the image URL — it doesn't load.");
-      return;
-    }
 
     try {
       setLoading(true);
@@ -104,26 +109,28 @@ export default function CreateTopicPage() {
       const token = localStorage.getItem('authToken') || sessionStorage.getItem('authToken');
 
       if (!token) {
-        // Not authenticated -> redirect to signin
-        setLoading(false);
         router.push('/auth/signin');
         return;
+      }
+
+      // The backend reads the uploaded file from req.file, so send multipart/form-data.
+      const formData = new FormData();
+      formData.append('title', title.trim());
+      formData.append('content', content.trim());
+      formData.append('codeSnippet', codeSnippet);
+      formData.append('language', language);
+      formData.append('tags', JSON.stringify(tags));
+      if (image) {
+        // This field name must match the backend's multer upload.single(...) field.
+        formData.append('image', image);
       }
 
       const res = await fetch(`${apiBaseUrl}/api/posts`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({
-          title,
-          content,
-          codeSnippet,
-          language,
-          imageUrl,
-          tags,
-        }),
+        body: formData,
       });
 
       const data = await res.json();
@@ -131,6 +138,7 @@ export default function CreateTopicPage() {
       if (!res.ok) {
         throw new Error(data?.message || 'Failed to create post.');
       }
+
       router.push('/');
     } catch (err: any) {
       console.error('Create Post Error:', err);
@@ -150,171 +158,65 @@ export default function CreateTopicPage() {
               Share your idea, ask a question, or open a space for developers to collaborate around a real problem.
             </p>
           </div>
-          <Link
-            href="/"
-            className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700"
-          >
+          <Link href="/" className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-emerald-300 hover:bg-emerald-50">
             Back home
           </Link>
         </div>
 
-        {error && (
-          <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-            {error}
-          </div>
-        )}
+        {error && <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div>}
 
         <form onSubmit={handleSubmit} className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
-          {/* Main Inputs (Title & Content) */}
           <div className="space-y-4">
             <div className="rounded-3xl border border-slate-200 bg-slate-50/80 p-4 sm:p-5">
-              <label htmlFor="title" className="mb-2 block text-sm font-semibold text-slate-700">
-                Topic Title <span className="text-red-500">*</span>
-              </label>
-              <input
-                id="title"
-                type="text"
-                required
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="How do you structure a scalable Next.js app?"
-                className="w-full border-0 bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400"
-              />
+              <label htmlFor="title" className="mb-2 block text-sm font-semibold text-slate-700">Topic Title <span className="text-red-500">*</span></label>
+              <input id="title" type="text" required value={title} onChange={(e) => setTitle(e.target.value)} placeholder="How do you structure a scalable Next.js app?" className="w-full border-0 bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400" />
             </div>
 
             <div className="rounded-3xl border border-slate-200 bg-slate-50/80 p-4 sm:p-5">
-              <label htmlFor="content" className="mb-2 block text-sm font-semibold text-slate-700">
-                What do you want to discuss? <span className="text-red-500">*</span>
-              </label>
-              <textarea
-                id="content"
-                required
-                rows={8}
-                value={content}
-                onChange={(e) => setContent(e.target.value)}
-                placeholder="Describe the problem, idea, question, or discussion you want the community to engage with..."
-                className="w-full resize-none border-0 bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400"
-              />
+              <label htmlFor="content" className="mb-2 block text-sm font-semibold text-slate-700">What do you want to discuss? <span className="text-red-500">*</span></label>
+              <textarea id="content" required rows={8} value={content} onChange={(e) => setContent(e.target.value)} placeholder="Describe the problem, idea, question, or discussion you want the community to engage with..." className="w-full resize-none border-0 bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400" />
             </div>
 
-            {/* Code Snippet Input */}
             <div className="rounded-3xl border border-slate-200 bg-slate-50/80 p-4 sm:p-5">
-              <label htmlFor="codeSnippet" className="mb-2 block text-sm font-semibold text-slate-700">
-                Code Snippet <span className="text-xs font-normal text-slate-500">(optional)</span>
-              </label>
-              <textarea
-                id="codeSnippet"
-                rows={5}
-                value={codeSnippet}
-                onChange={(e) => setCodeSnippet(e.target.value)}
-                placeholder="// Paste code block here..."
-                className="w-full resize-none border-0 bg-transparent font-mono text-xs text-slate-900 outline-none placeholder:text-slate-400"
-              />
+              <label htmlFor="codeSnippet" className="mb-2 block text-sm font-semibold text-slate-700">Code Snippet <span className="text-xs font-normal text-slate-500">(optional)</span></label>
+              <textarea id="codeSnippet" rows={5} value={codeSnippet} onChange={(e) => setCodeSnippet(e.target.value)} placeholder="// Paste code block here..." className="w-full resize-none border-0 bg-transparent font-mono text-xs text-slate-900 outline-none placeholder:text-slate-400" />
             </div>
           </div>
 
-          {/* Right Sidebar Options */}
           <div className="space-y-4">
-            {/* Language Selector */}
             <div className="rounded-3xl border border-slate-200 bg-slate-50/80 p-4 sm:p-5">
-              <label htmlFor="language" className="mb-2 block text-sm font-semibold text-slate-700">
-                Code Language
-              </label>
-              <select
-                id="language"
-                value={language}
-                onChange={(e) => setLanguage(e.target.value)}
-                className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none"
-              >
+              <label htmlFor="language" className="mb-2 block text-sm font-semibold text-slate-700">Code Language</label>
+              <select id="language" value={language} onChange={(e) => setLanguage(e.target.value)} className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none">
                 <option value="">Select language (optional)</option>
-                {programmingLanguages.map((lang) => (
-                  <option key={lang} value={lang}>
-                    {lang}
-                  </option>
-                ))}
+                {programmingLanguages.map((lang) => <option key={lang} value={lang}>{lang}</option>)}
               </select>
             </div>
 
-            {/* Tags Input */}
             <div className="rounded-3xl border border-slate-200 bg-slate-50/80 p-4 sm:p-5">
-              <label htmlFor="tags" className="mb-2 block text-sm font-semibold text-slate-700">
-                Tags <span className="text-xs font-normal text-slate-500">(add and press Enter)</span>
-              </label>
+              <label htmlFor="tags" className="mb-2 block text-sm font-semibold text-slate-700">Tags <span className="text-xs font-normal text-slate-500">(add and press Enter)</span></label>
               <div className="mb-2 flex flex-wrap gap-2">
-                {tags.map((t) => (
-                  <button
-                    key={t}
-                    type="button"
-                    onClick={() => removeTag(t)}
-                    className="rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1 text-xs text-emerald-700"
-                  >
-                    {t} ×
-                  </button>
-                ))}
+                {tags.map((tag) => <button key={tag} type="button" onClick={() => removeTag(tag)} className="rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1 text-xs text-emerald-700">{tag} ×</button>)}
               </div>
-              <input
-                id="tags"
-                value={tagInput}
-                onChange={(e) => setTagInput(e.target.value)}
-                onKeyDown={handleTagKeyDown}
-                placeholder="Add tags, e.g. performance, react"
-                className="w-full border-0 bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400"
-              />
+              <input id="tags" value={tagInput} onChange={(e) => setTagInput(e.target.value)} onKeyDown={handleTagKeyDown} placeholder="Add tags, e.g. performance, react" className="w-full border-0 bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400" />
             </div>
 
-            {/* Image URL Input */}
             <div className="rounded-3xl border border-slate-200 bg-slate-50/80 p-4 sm:p-5">
-              <label htmlFor="imageUrl" className="mb-2 block text-sm font-semibold text-slate-700">
-                Image URL
-              </label>
-              <input
-                id="imageUrl"
-                type="url"
-                value={imageUrl}
-                onChange={(e) => {
-                  setImageUrl(e.target.value);
-                  setImgStatus('idle');
-                }}
-                onBlur={() => validateImageUrl(imageUrl)}
-                placeholder="https://example.com/image.png"
-                className="w-full border-0 bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400"
-              />
-              {imgStatus === 'checking' && (
-                <p className="mt-1 text-xs text-slate-400">Checking image…</p>
-              )}
-              {imgStatus === 'invalid' && (
-                <p className="mt-1 text-xs text-red-600">This doesn't look like a loadable image URL.</p>
-              )}
-              {imgStatus === 'valid' && (
-                <>
-                  <p className="mt-1 text-xs text-emerald-600">Looks good.</p>
-                  <img
-                    src={imageUrl}
-                    alt="preview"
-                    className="mt-2 h-24 w-full rounded-xl object-cover"
-                  />
-                </>
+              <label htmlFor="image" className="mb-2 block text-sm font-semibold text-slate-700">Cover Image <span className="text-xs font-normal text-slate-500">(optional, max 5 MB)</span></label>
+              <input id="image" type="file" accept="image/*" onChange={handleImageChange} className="block w-full text-sm text-slate-600 file:mr-3 file:rounded-full file:border-0 file:bg-emerald-50 file:px-4 file:py-2 file:font-medium file:text-emerald-700 hover:file:bg-emerald-100" />
+              {imagePreview && (
+                <div className="relative mt-3">
+                  <img src={imagePreview} alt="Selected cover preview" className="h-40 w-full rounded-xl object-cover" />
+                  <button type="button" onClick={removeImage} className="absolute right-2 top-2 rounded-full bg-slate-900/75 px-3 py-1 text-xs font-medium text-white hover:bg-slate-900">Remove</button>
+                </div>
               )}
             </div>
 
             <div className="rounded-3xl border border-emerald-200 bg-emerald-50/70 p-4 sm:p-5">
               <p className="text-sm font-semibold text-emerald-800">Before you publish</p>
-              <ul className="mt-2 list-disc space-y-2 pl-5 text-sm text-emerald-700">
-                <li>Make the title clear and specific.</li>
-                <li>Give enough context so people can reply meaningfully.</li>
-                <li>Format any code snippets properly.</li>
-              </ul>
+              <ul className="mt-2 list-disc space-y-2 pl-5 text-sm text-emerald-700"><li>Make the title clear and specific.</li><li>Give enough context so people can reply meaningfully.</li><li>Format any code snippets properly.</li></ul>
             </div>
 
-            <div className="pt-2">
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full rounded-full bg-emerald-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:opacity-50"
-              >
-                {loading ? 'Publishing...' : 'Publish topic'}
-              </button>
-            </div>
+            <div className="pt-2"><button type="submit" disabled={loading} className="w-full rounded-full bg-emerald-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:opacity-50">{loading ? 'Publishing...' : 'Publish topic'}</button></div>
           </div>
         </form>
       </div>
