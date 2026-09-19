@@ -851,7 +851,7 @@ export default function Home() {
                     const contentExpanded = expandedPosts.has(postId);
                     const displayedContent =
                       contentIsLong && !contentExpanded
-                        ? post.content.slice(0, CONTENT_TRUNCATE_LENGTH).trimEnd() + '…'
+                        ? post.content.slice(0, CONTENT_TRUNCATE_LENGTH).trimEnd()
                         : post.content;
 
                     // Long-code collapse (by line count, not just character count,
@@ -904,18 +904,23 @@ export default function Home() {
                           <Text className="text-xl md:text-2xl font-bold text-slate-900 dark:text-slate-100 mt-3 mb-1">{post.title}</Text>
                         ) : null}
 
+                        {/*
+                          "Read more"/"Show less" now render inline, in place of
+                          where the truncation cuts off — no more trailing "…"
+                          and no separate line below the paragraph.
+                        */}
                         <Text className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed mt-2 whitespace-pre-wrap">
                           {displayedContent}
+                          {contentIsLong ? (
+                            <button
+                              type="button"
+                              onClick={() => toggleExpanded(postId)}
+                              className="ml-1 text-xs font-semibold text-emerald-600 hover:text-emerald-700 dark:text-emerald-400"
+                            >
+                              {contentExpanded ? 'Show less' : 'Read more'}
+                            </button>
+                          ) : null}
                         </Text>
-                        {contentIsLong ? (
-                          <button
-                            type="button"
-                            onClick={() => toggleExpanded(postId)}
-                            className="mt-1 text-xs font-semibold text-emerald-600 hover:text-emerald-700 dark:text-emerald-400"
-                          >
-                            {contentExpanded ? 'Show less' : 'Read more'}
-                          </button>
-                        ) : null}
 
                         {post.codeSnippet ? (
                           <Box className="mt-3">
@@ -950,8 +955,9 @@ export default function Home() {
                             className="mt-3 rounded-xl w-full object-cover max-h-64"
                             onError={(e) => {
                               // Hide the broken-image icon rather than show it —
-                              // the underlying cause (bad/relative imageUrl at
-                              // save time) still needs fixing at the source.
+                              // this is a safety net for legacy posts saved
+                              // before validation was added at creation time
+                              // (see CreateTopicPage.tsx).
                               (e.currentTarget as HTMLImageElement).style.display = 'none';
                             }}
                           />
