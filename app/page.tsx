@@ -379,8 +379,8 @@ function CommentThread({
 
 export default function Home() {
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [selectedCountry, setSelectedCountry] = useState('all
-  const [notifications, setNotifications] = useState<WebNotification[]>([]);');
+  const [selectedCountry, setSelectedCountry] = useState('all');
+  const [notifications, setNotifications] = useState<WebNotification[]>([]);
   const [openPopover, setOpenPopover] = useState<string | null>(null);
   const [activePostId, setActivePostId] = useState<string | null>(null);
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
