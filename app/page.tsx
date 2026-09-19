@@ -433,6 +433,54 @@ export default function Home() {
     return Array.from(s).sort();
   }, [posts]);
 
+  async function registerForPushNotifications() {
+  if (
+    typeof window === 'undefined' ||
+    !('serviceWorker' in navigator) ||
+    !('PushManager' in window)
+  ) {
+    console.warn('Web Push is not supported in this browser.');
+    return;
+  }
+
+  const token = getToken();
+  const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+
+  if (!token || !vapidPublicKey) {
+    console.warn('Missing auth token or NEXT_PUBLIC_VAPID_PUBLIC_KEY.');
+    return;
+  }
+
+  const permission = await Notification.requestPermission();
+
+  if (permission !== 'granted') {
+    console.warn('Notification permission was not granted.');
+    return;
+  }
+
+  const registration = await navigator.serviceWorker.register('/sw.js');
+
+  let subscription = await registration.pushManager.getSubscription();
+
+  if (!subscription) {
+    subscription = await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
+    });
+  }
+
+  const response = await fetch(`${getApiBase()}/api/push/subscribe`, {
+    method: 'POST',
+    headers: authHeaders(token),
+    body: JSON.stringify(subscription.toJSON()),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Push subscription failed: ${response.status}`);
+  }
+
+  console.log('Push subscription saved.');
+}
   useEffect(() => {
   const token = getToken();
 
