@@ -4,6 +4,7 @@ import { useEffect, useState, useRef, useMemo, type MouseEvent } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { Box } from '@/components/ui/box';
 import { Text } from '@/components/ui/text';
+import { io, type Socket } from 'socket.io-client';
 import {
   ArrowUpIcon,
   CloseIcon,
@@ -57,6 +58,15 @@ interface CurrentUser {
   languages?: string[];
   framework?: string[];
   frameworks?: string[];
+}
+
+interface WebNotification {
+  type: 'post' | 'comment' | 'reply';
+  postId: string;
+  commentId?: string;
+  actorId: string;
+  actorUsername?: string;
+  message: string;
 }
 
 interface Reply {
@@ -117,6 +127,19 @@ function getToken(): string {
     window.sessionStorage.getItem('authToken') ??
     window.localStorage.getItem('token') ??
     ''
+  );
+}
+
+function urlBase64ToUint8Array(base64String: string) {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding)
+    .replace(/-/g, '+')
+    .replace(/_/g, '/');
+
+  const rawData = window.atob(base64);
+
+  return Uint8Array.from(
+    [...rawData].map((character) => character.charCodeAt(0)),
   );
 }
 
@@ -356,7 +379,8 @@ function CommentThread({
 
 export default function Home() {
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [selectedCountry, setSelectedCountry] = useState('all');
+  const [selectedCountry, setSelectedCountry] = useState('all
+  const [notifications, setNotifications] = useState<WebNotification[]>([]);');
   const [openPopover, setOpenPopover] = useState<string | null>(null);
   const [activePostId, setActivePostId] = useState<string | null>(null);
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
@@ -408,6 +432,39 @@ export default function Home() {
     });
     return Array.from(s).sort();
   }, [posts]);
+
+  useEffect(() => {
+  const token = getToken();
+
+  if (!token) return;
+
+  const socket: Socket = io(getApiBase(), {
+    auth: { token },
+  });
+
+  socket.on('notification', (notification: WebNotification) => {
+    setNotifications((previous) => [notification, ...previous]);
+
+    if (
+      document.hidden &&
+      'Notification' in window &&
+      window.Notification.permission === 'granted'
+    ) {
+      new window.Notification('DevConnect', {
+        body: notification.message,
+        icon: '/icon/logo.png',
+      });
+    }
+  });
+
+  socket.on('connect_error', (error) => {
+    console.error('Notification socket error:', error.message);
+  });
+
+  return () => {
+    socket.disconnect();
+  };
+}, [currentUser]);
 
   useEffect(() => {
     const s = window.localStorage.getItem('theme');
