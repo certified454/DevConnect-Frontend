@@ -91,12 +91,20 @@ interface Post {
   state?: string;
 }
 
+interface FeaturedHangout {
+  _id: string;
+  topic: string;
+  status: 'Upcoming' | 'Live' | 'Ended';
+  scheduledAt: string;
+  host?: { username: string; profilePic?: string };
+  participant?: { user: string }[];
+}
 
-const HANGOUT_STORAGE_KEY = 'devconnect-joined-hangouts';
-const HANGOUT_ID = 'devconnect-hangout-1';
 const PROFILE_REMINDER_DISMISS_KEY = 'devconnect-profile-reminder-dismissed';
 const FALLBACK_AVATAR = 'https://th.bing.com/th/id/OIP.AhjRvsXgcvfCcr8Zj07lcgHaE7?w=280&h=187&c=7&r=0&o=7&dpr=1.3&pid=1.7&rm=3';
 const PULL_THRESHOLD = 60;
+const CONTENT_TRUNCATE_LENGTH = 150;
+const CODE_COLLAPSE_LINE_THRESHOLD = 6;
 
 function getApiBase() {
   return (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:5000').replace(/\/$/, '');
@@ -116,14 +124,6 @@ function authHeaders(token: string): Record<string, string> {
   return { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` };
 }
 
-function getStoredJoinedHangouts(): string[] {
-  if (typeof window === 'undefined') return [];
-  try {
-    const s = window.localStorage.getItem(HANGOUT_STORAGE_KEY);
-    return s ? JSON.parse(s) : [];
-  } catch { return []; }
-}
-
 function timeAgo(iso?: string): string {
   if (!iso) return '';
   const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
@@ -133,6 +133,17 @@ function timeAgo(iso?: string): string {
   if (diff < 86400) { const h = Math.floor(diff / 3600);  return `${h} ${h === 1 ? 'hr' : 'hrs'} ago`; }
   if (diff < 604800){ const d = Math.floor(diff / 86400); return `${d} ${d === 1 ? 'day' : 'days'} ago`; }
   return new Date(iso).toLocaleDateString('en-NG', { month: 'short', day: 'numeric' });
+}
+
+// Big-digit countdown for the hangout widget — "2d 05 : 56 : 43".
+function formatHangoutCountdown(ms: number): string {
+  const totalSeconds = Math.max(0, Math.floor(ms / 1000));
+  const days = Math.floor(totalSeconds / 86400);
+  const hours = Math.floor((totalSeconds % 86400) / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${days > 0 ? `${days}d ` : ''}${pad(hours)} : ${pad(minutes)} : ${pad(seconds)}`;
 }
 
 function getUserId(u: CurrentUser | null): string {
@@ -164,9 +175,6 @@ function HouseIcon({ className = 'h-5 w-5' }: { className?: string }) {
 }
 function CalendarIcon({ className = 'h-5 w-5' }: { className?: string }) {
   return <svg viewBox="0 0 24 24" fill="currentColor" className={className}><path d="M7 2a1 1 0 0 1 1 1v1h8V3a1 1 0 1 1 2 0v1h1a3 3 0 0 1 3 3v12a3 3 0 0 1-3 3H5a3 3 0 0 1-3-3V6a3 3 0 0 1 3-3h1V3a1 1 0 0 1 1-1Zm13 8H4v8a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-8Z" /></svg>;
-}
-function MessageIcon({ className = 'h-5 w-5' }: { className?: string }) {
-  return <svg viewBox="0 0 24 24" fill="currentColor" className={className}><path d="M5 4h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-5.5l-3.6 3.2a1 1 0 0 1-1.6-.8V18H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Zm2 4a1 1 0 1 0 0 2h8a1 1 0 1 0 0-2H7Zm0 4a1 1 0 1 0 0 2h5a1 1 0 1 0 0-2H7Z" /></svg>;
 }
 function SparkIcon({ className = 'h-5 w-5' }: { className?: string }) {
   return <svg viewBox="0 0 24 24" fill="currentColor" className={className}><path d="m12 2 2 6 6 2-6 2-2 6-2-6-6-2 6-2 2-6Z" /></svg>;
@@ -355,7 +363,6 @@ export default function Home() {
   const [showScrollTop, setShowScrollTop] = useState(false);
   const [showProfileReminder, setShowProfileReminder] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
-  const [joinedHangouts, setJoinedHangouts] = useState<string[]>([]);
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
   const [postsLoading, setPostsLoading] = useState(true);
@@ -368,6 +375,26 @@ export default function Home() {
   const pullStartRef = useRef<number | null>(null);
   const viewedPostsRef = useRef<Set<string>>(new Set());
   const uid = getUserId(currentUser);
+
+  // Long-content / long-code collapse state — keyed by post id.
+  const [expandedPosts, setExpandedPosts] = useState<Set<string>>(new Set());
+  const [expandedCode, setExpandedCode] = useState<Set<string>>(new Set());
+  const toggleExpanded = (id: string) =>
+    setExpandedPosts((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  const toggleCodeExpanded = (id: string) =>
+    setExpandedCode((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+
+  // Real hangout widget — replaces the old hardcoded topic/countdown.
+  const [featuredHangout, setFeaturedHangout] = useState<FeaturedHangout | null>(null);
+  const [hangoutNow, setHangoutNow] = useState(() => Date.now());
 
   const router = useRouter();
   const pathname = usePathname();
@@ -398,9 +425,6 @@ export default function Home() {
     onScroll();
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
-
-  // ── Hangout storage ────────────────────────────────────────────────────────
-  useEffect(() => { setJoinedHangouts(getStoredJoinedHangouts()); }, []);
 
   useEffect(() => {
     const token = getToken();
@@ -441,6 +465,26 @@ export default function Home() {
       .catch((err) => console.error('fetchPosts error:', err))
       .finally(() => { setPostsLoading(false); setIsRefreshing(false); });
   }, [refreshCounter]);
+
+  // ── Featured hangout: Live takes priority, otherwise the soonest Upcoming ──
+  useEffect(() => {
+    fetch(`${getApiBase()}/api/hangouts`)
+      .then((r) => r.json())
+      .then((data) => {
+        const list: FeaturedHangout[] = Array.isArray(data) ? data : (data.hangouts ?? []);
+        const live = list.find((h) => h.status === 'Live');
+        const soonestUpcoming = [...list.filter((h) => h.status === 'Upcoming')].sort(
+          (a, b) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime()
+        )[0];
+        setFeaturedHangout(live ?? soonestUpcoming ?? null);
+      })
+      .catch((err) => console.error('fetchFeaturedHangout error:', err));
+  }, []);
+
+  useEffect(() => {
+    const interval = setInterval(() => setHangoutNow(Date.now()), 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     const el = feedRef.current;
@@ -570,11 +614,9 @@ export default function Home() {
     }));
   };
 
-  const handleJoinHangout = () => {
-    const updated = joinedHangouts.includes(HANGOUT_ID) ? joinedHangouts : [...joinedHangouts, HANGOUT_ID];
-    setJoinedHangouts(updated);
-    window.localStorage.setItem(HANGOUT_STORAGE_KEY, JSON.stringify(updated));
-    router.push('/hangout');
+  const goToFeaturedHangout = () => {
+    if (!featuredHangout) return;
+    router.push(`/hangout/${featuredHangout._id}`);
   };
 
   const handleSignIn = () => router.push('/auth/signin');
@@ -804,6 +846,21 @@ export default function Home() {
                     const authorCountry = getCountryName(post.user?.country);
                     const postTags: string[] = post.tags ?? [];
 
+                    // Long-content collapse.
+                    const contentIsLong = post.content.length > CONTENT_TRUNCATE_LENGTH;
+                    const contentExpanded = expandedPosts.has(postId);
+                    const displayedContent =
+                      contentIsLong && !contentExpanded
+                        ? post.content.slice(0, CONTENT_TRUNCATE_LENGTH).trimEnd() + '…'
+                        : post.content;
+
+                    // Long-code collapse (by line count, not just character count,
+                    // so a few long lines don't dodge the collapse and a short
+                    // multi-line snippet doesn't get needlessly collapsed).
+                    const codeLineCount = post.codeSnippet ? post.codeSnippet.split('\n').length : 0;
+                    const codeIsLong = codeLineCount > CODE_COLLAPSE_LINE_THRESHOLD || (post.codeSnippet?.length ?? 0) > 320;
+                    const codeExpanded = expandedCode.has(postId);
+
                     return (
                       <Card
                         key={postId}
@@ -846,16 +903,58 @@ export default function Home() {
                         {post.title ? (
                           <Text className="text-xl md:text-2xl font-bold text-slate-900 dark:text-slate-100 mt-3 mb-1">{post.title}</Text>
                         ) : null}
-                        <Text className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed mt-2">{post.content}</Text>
+
+                        <Text className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed mt-2 whitespace-pre-wrap">
+                          {displayedContent}
+                        </Text>
+                        {contentIsLong ? (
+                          <button
+                            type="button"
+                            onClick={() => toggleExpanded(postId)}
+                            className="mt-1 text-xs font-semibold text-emerald-600 hover:text-emerald-700 dark:text-emerald-400"
+                          >
+                            {contentExpanded ? 'Show less' : 'Read more'}
+                          </button>
+                        ) : null}
 
                         {post.codeSnippet ? (
-                          <pre className="mt-3 rounded-xl bg-slate-950 text-emerald-300 p-4 text-xs overflow-x-auto">
-                            <code>{post.codeSnippet}</code>
-                          </pre>
+                          <Box className="mt-3">
+                            <Box className="relative">
+                              <pre
+                                className={`rounded-xl bg-slate-950 text-emerald-300 p-4 text-xs overflow-x-auto ${
+                                  codeIsLong && !codeExpanded ? 'max-h-32 overflow-hidden' : ''
+                                }`}
+                              >
+                                <code>{post.codeSnippet}</code>
+                              </pre>
+                              {codeIsLong && !codeExpanded ? (
+                                <div className="pointer-events-none absolute inset-x-0 bottom-0 h-10 rounded-b-xl bg-gradient-to-t from-slate-950 to-transparent" />
+                              ) : null}
+                            </Box>
+                            {codeIsLong ? (
+                              <button
+                                type="button"
+                                onClick={() => toggleCodeExpanded(postId)}
+                                className="mt-2 text-xs font-semibold text-emerald-600 hover:text-emerald-700 dark:text-emerald-400"
+                              >
+                                {codeExpanded ? 'Collapse code' : 'Show full code'}
+                              </button>
+                            ) : null}
+                          </Box>
                         ) : null}
 
                         {post.imageUrl ? (
-                          <img src={post.imageUrl} alt="post" className="mt-3 rounded-xl w-full object-cover max-h-64" />
+                          <img
+                            src={post.imageUrl}
+                            alt="post"
+                            className="mt-3 rounded-xl w-full object-cover max-h-64"
+                            onError={(e) => {
+                              // Hide the broken-image icon rather than show it —
+                              // the underlying cause (bad/relative imageUrl at
+                              // save time) still needs fixing at the source.
+                              (e.currentTarget as HTMLImageElement).style.display = 'none';
+                            }}
+                          />
                         ) : null}
 
                         {/* Tags */}
@@ -906,31 +1005,63 @@ export default function Home() {
 
             {/* Right sidebar */}
             <Box className="order-1 w-full flex flex-col gap-4 md:order-2 md:h-full md:w-[35%] md:overflow-y-auto scrollbar-hide">
-              <Card className="w-full rounded-2xl bg-white border border-slate-100 p-4 dark:bg-slate-900 dark:border-slate-800 shadow shadow-slate-200 dark:shadow-slate-950/40">
-                <Box className="flex-row items-center justify-between md:block">
-                  <Text className="text-sm font-semibold text-slate-900 dark:text-slate-100 md:text-center md:text-base">Upcoming Live Hangout</Text>
-                  <Text className="text-xs font-bold text-emerald-700 md:hidden">05:56:43</Text>
-                </Box>
-                <Box className="flex-row items-center gap-3 mt-3 md:justify-center">
-                  <Avatar className="h-10 w-10 md:h-12 md:w-12 border border-slate-700">
-                    <AvatarImage source={{ uri: FALLBACK_AVATAR }}/>
-                  </Avatar>
-                  <Box className="min-w-0 flex-1 gap-0.5 md:flex-none md:text-center">
-                    <Text className="text-[10px] text-slate-400 dark:text-slate-300 md:text-xs">Topic</Text>
-                    <Text className="truncate text-xs font-semibold text-slate-900 dark:text-slate-100 md:text-sm">Tech Market Pricing in Nigeria</Text>
+              {featuredHangout ? (
+                <Card className="w-full rounded-2xl bg-white border border-slate-100 p-4 dark:bg-slate-900 dark:border-slate-800 shadow shadow-slate-200 dark:shadow-slate-950/40">
+                  <Box className="flex-row items-center justify-between md:block">
+                    <Text className="text-sm font-semibold text-slate-900 dark:text-slate-100 md:text-center md:text-base">
+                      {featuredHangout.status === 'Live' ? 'Live Hangout' : 'Upcoming Live Hangout'}
+                    </Text>
+                    {featuredHangout.status === 'Live' ? (
+                      <Box className="flex-row items-center gap-1 md:hidden">
+                        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-rose-500" />
+                        <Text className="text-xs font-bold text-rose-600">LIVE</Text>
+                      </Box>
+                    ) : (
+                      <Text className="text-xs font-bold text-emerald-700 md:hidden">
+                        {formatHangoutCountdown(new Date(featuredHangout.scheduledAt).getTime() - hangoutNow)}
+                      </Text>
+                    )}
                   </Box>
-                  <Button onPress={handleJoinHangout} className={`h-7 shrink-0 rounded-full px-3 py-0 md:hidden ${joinedHangouts.includes(HANGOUT_ID) ? 'bg-slate-500' : 'bg-emerald-600'}`}>
-                    <ButtonText className="text-[11px] font-semibold text-white">{joinedHangouts.includes(HANGOUT_ID) ? 'Joined' : 'Join'}</ButtonText>
+                  <Box className="flex-row items-center gap-3 mt-3 md:justify-center">
+                    <Avatar className="h-10 w-10 md:h-12 md:w-12 border border-slate-700">
+                      <AvatarImage source={{ uri: featuredHangout.host?.profilePic ?? FALLBACK_AVATAR }} />
+                    </Avatar>
+                    <Box className="min-w-0 flex-1 gap-0.5 md:flex-none md:text-center">
+                      <Text className="text-[10px] text-slate-400 dark:text-slate-300 md:text-xs">Topic</Text>
+                      <Text className="truncate text-xs font-semibold text-slate-900 dark:text-slate-100 md:text-sm">{featuredHangout.topic}</Text>
+                    </Box>
+                    <Button onPress={goToFeaturedHangout} className="h-7 shrink-0 rounded-full px-3 py-0 md:hidden bg-emerald-600">
+                      <ButtonText className="text-[11px] font-semibold text-white">Join</ButtonText>
+                    </Button>
+                  </Box>
+                  <Box className="hidden items-center gap-2 mt-4 md:flex md:flex-col">
+                    {featuredHangout.status === 'Live' ? (
+                      <Box className="flex-row items-center gap-1.5">
+                        <span className="h-2 w-2 animate-pulse rounded-full bg-rose-500" />
+                        <Text className="text-xs font-semibold text-rose-600">Live now</Text>
+                      </Box>
+                    ) : (
+                      <>
+                        <Text className="text-xs text-slate-400 dark:text-slate-300">Starts In</Text>
+                        <Text className="text-lg font-bold tabular-nums text-slate-900 dark:text-slate-100">
+                          {formatHangoutCountdown(new Date(featuredHangout.scheduledAt).getTime() - hangoutNow)}
+                        </Text>
+                      </>
+                    )}
+                    <Button onPress={goToFeaturedHangout} className="mt-1 w-full py-2 rounded-xl bg-emerald-600">
+                      <Text className="text-xs font-semibold text-white">{featuredHangout.status === 'Live' ? 'Join Live' : 'Join Hangout'}</Text>
+                    </Button>
+                  </Box>
+                </Card>
+              ) : (
+                <Card className="w-full rounded-2xl bg-white border border-slate-100 p-4 text-center dark:bg-slate-900 dark:border-slate-800">
+                  <Text className="text-sm font-semibold text-slate-900 dark:text-slate-100">No hangouts scheduled</Text>
+                  <Text className="mt-1 text-xs text-slate-400 dark:text-slate-500">Check back soon, or browse past ones.</Text>
+                  <Button onPress={() => router.push('/hangout')} className="mt-3 w-full rounded-xl bg-emerald-600 py-2">
+                    <Text className="text-xs font-semibold text-white">Browse hangouts</Text>
                   </Button>
-                </Box>
-                <Box className="hidden items-center gap-2 mt-4 md:flex md:flex-col">
-                  <Text className="text-xs text-slate-400 dark:text-slate-300">Starts In</Text>
-                  <Text className="text-lg font-bold text-slate-900 dark:text-slate-100">05 : 56 : 43</Text>
-                  <Button onPress={handleJoinHangout} className={`mt-1 w-full py-2 rounded-xl ${joinedHangouts.includes(HANGOUT_ID) ? 'bg-slate-500' : 'bg-emerald-600'}`}>
-                    <Text className="text-xs font-semibold text-white">{joinedHangouts.includes(HANGOUT_ID) ? 'Joined' : 'Join Hangout'}</Text>
-                  </Button>
-                </Box>
-              </Card>
+                </Card>
+              )}
               <SiteFooter className="hidden md:block" />
             </Box>
           </Box>
