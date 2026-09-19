@@ -20,6 +20,8 @@ const programmingLanguages = [
   'sql',
 ];
 
+type ImageStatus = 'idle' | 'checking' | 'valid' | 'invalid';
+
 export default function CreateTopicPage() {
   const router = useRouter();
 
@@ -33,6 +35,7 @@ export default function CreateTopicPage() {
   const [tagInput, setTagInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [imgStatus, setImgStatus] = useState<ImageStatus>('idle');
 
   const addTag = (raw: string) => {
     const t = raw.trim();
@@ -54,17 +57,44 @@ export default function CreateTopicPage() {
     }
   };
 
+  const validateImageUrl = (url: string) => {
+    if (!url.trim()) {
+      setImgStatus('idle');
+      return;
+    }
+    let parsed: URL;
+    try {
+      parsed = new URL(url);
+    } catch {
+      setImgStatus('invalid');
+      return;
+    }
+    if (!['http:', 'https:'].includes(parsed.protocol)) {
+      setImgStatus('invalid');
+      return;
+    }
+
+    setImgStatus('checking');
+    const img = new Image();
+    img.onload = () => setImgStatus('valid');
+    img.onerror = () => setImgStatus('invalid');
+    img.src = url;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
 
-    // Frontend validation matching controller requirements
     if (!title.trim()) {
       setError('Post title is required.');
       return;
     }
     if (!content.trim()) {
       setError('Post content cannot be empty.');
+      return;
+    }
+    if (imageUrl.trim() && imgStatus === 'invalid') {
+      setError("Please fix or remove the image URL — it doesn't load.");
       return;
     }
 
@@ -101,8 +131,6 @@ export default function CreateTopicPage() {
       if (!res.ok) {
         throw new Error(data?.message || 'Failed to create post.');
       }
-
-      // Success -> Redirect to homepage / feed
       router.push('/');
     } catch (err: any) {
       console.error('Create Post Error:', err);
@@ -243,10 +271,30 @@ export default function CreateTopicPage() {
                 id="imageUrl"
                 type="url"
                 value={imageUrl}
-                onChange={(e) => setImageUrl(e.target.value)}
+                onChange={(e) => {
+                  setImageUrl(e.target.value);
+                  setImgStatus('idle');
+                }}
+                onBlur={() => validateImageUrl(imageUrl)}
                 placeholder="https://example.com/image.png"
                 className="w-full border-0 bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400"
               />
+              {imgStatus === 'checking' && (
+                <p className="mt-1 text-xs text-slate-400">Checking image…</p>
+              )}
+              {imgStatus === 'invalid' && (
+                <p className="mt-1 text-xs text-red-600">This doesn't look like a loadable image URL.</p>
+              )}
+              {imgStatus === 'valid' && (
+                <>
+                  <p className="mt-1 text-xs text-emerald-600">Looks good.</p>
+                  <img
+                    src={imageUrl}
+                    alt="preview"
+                    className="mt-2 h-24 w-full rounded-xl object-cover"
+                  />
+                </>
+              )}
             </div>
 
             <div className="rounded-3xl border border-emerald-200 bg-emerald-50/70 p-4 sm:p-5">
