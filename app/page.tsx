@@ -81,6 +81,7 @@ interface Post {
   title?: string;
   content: string;
   codeSnippet?: string;
+  postImageUrl?: string;
   imageUrl?: string;
   tags?: string[];
   likes: string[];
@@ -105,6 +106,10 @@ const FALLBACK_AVATAR = 'https://th.bing.com/th/id/OIP.AhjRvsXgcvfCcr8Zj07lcgHaE
 const PULL_THRESHOLD = 60;
 const CONTENT_TRUNCATE_LENGTH = 150;
 const CODE_COLLAPSE_LINE_THRESHOLD = 6;
+const POSTS_CACHE_KEY = 'devconnect-posts-cache';
+const POSTS_CACHE_TTL = 60 * 1000;
+
+let postsMemoryCache: { posts: Post[]; timestamp: number } | null = null;
 
 function getApiBase() {
   return (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:5000').replace(/\/$/, '');
@@ -118,6 +123,54 @@ function getToken(): string {
     window.localStorage.getItem('token') ??
     ''
   );
+}
+
+function readPostsCache(): Post[] | null {
+  if (postsMemoryCache && Date.now() - postsMemoryCache.timestamp < POSTS_CACHE_TTL) {
+    return postsMemoryCache.posts;
+  }
+
+  if (typeof window === 'undefined') return null;
+
+  try {
+    const cached = window.sessionStorage.getItem(POSTS_CACHE_KEY);
+    if (!cached) return null;
+
+    const parsed = JSON.parse(cached);
+
+    if (!parsed || !Array.isArray(parsed.posts) || Date.now() - parsed.timestamp >= POSTS_CACHE_TTL) {
+      return null;
+    }
+
+    postsMemoryCache = parsed;
+    return parsed.posts;
+  } catch {
+    return null;
+  }
+}
+
+function writePostsCache(posts: Post[]) {
+  const value = {
+    posts,
+    timestamp: Date.now(),
+  };
+
+  postsMemoryCache = value;
+
+  if (typeof window !== 'undefined') {
+    window.sessionStorage.setItem(POSTS_CACHE_KEY, JSON.stringify(value));
+  }
+}
+
+function normalizePost(post: any): Post {
+  return {
+    ...post,
+    postImageUrl: post.postImageUrl ?? post.imageUrl ?? '',
+    imageUrl: post.imageUrl ?? post.postImageUrl ?? '',
+    likes: Array.isArray(post.likes) ? post.likes : [],
+    comments: Array.isArray(post.comments) ? post.comments : [],
+    tags: Array.isArray(post.tags) ? post.tags : [],
+  };
 }
 
 function authHeaders(token: string): Record<string, string> {
@@ -171,10 +224,10 @@ function getCountryName(c: any): string {
 }
 
 function HouseIcon({ className = 'h-5 w-5' }: { className?: string }) {
-  return <svg viewBox="0 0 24 24" fill="currentColor" className={className}><path d="M12.53 3.3a1 1 0 0 0-1.06 0l-8 5.95A1 1 0 0 0 3 9.95V20a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1v-4h6v4a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1V9.95a1 1 0 0 0-.47-.9l-8-5.95Z" /></svg>;
+  return <svg viewBox="0 0 24 24" fill="currentColor" className={className}><path d="M12.53 3.3a1 1 0 0 0-1.06 0l-8 5.95A1 1 0 0 0 3 9.95V20a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1v-4h6v4a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1V9.95a1 1 0 0 0-.47-.7l-8-5.95ZM12 5.1l6 4.45V19h-2v-4a1 1 0 0 0-1-1H9a1 1 0 0 0-1 1v4H6V9.55L12 5.1Z" /></svg>;
 }
 function CalendarIcon({ className = 'h-5 w-5' }: { className?: string }) {
-  return <svg viewBox="0 0 24 24" fill="currentColor" className={className}><path d="M7 2a1 1 0 0 1 1 1v1h8V3a1 1 0 1 1 2 0v1h1a3 3 0 0 1 3 3v12a3 3 0 0 1-3 3H5a3 3 0 0 1-3-3V6a3 3 0 0 1 3-3h1V3a1 1 0 0 1 1-1Zm13 8H4v8a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-8Z" /></svg>;
+  return <svg viewBox="0 0 24 24" fill="currentColor" className={className}><path d="M7 2a1 1 0 0 1 1 1v1h8V3a1 1 0 1 1 2 0v1h1a3 3 0 0 1 3 3v12a3 3 0 0 1-3 3H5a3 3 0 0 1-3-3V6a3 3 0 0 1 3-3h1V3a1 1 0 0 1 1-1Zm12 7H5v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9Zm-1-4H6a1 1 0 0 0-1 1v2h14V6a1 1 0 0 0-1-1Z" /></svg>;
 }
 function SparkIcon({ className = 'h-5 w-5' }: { className?: string }) {
   return <svg viewBox="0 0 24 24" fill="currentColor" className={className}><path d="m12 2 2 6 6 2-6 2-2 6-2-6-6-2 6-2 2-6Z" /></svg>;
@@ -269,7 +322,6 @@ function CommentThread({
 
   return (
     <Box className="border border-slate-100 dark:border-slate-800 rounded-xl overflow-hidden">
-      {/* Comment row */}
       <Box className="flex items-start px-3 py-2.5">
         <Box className="flex flex-row gap-2">
           <Avatar className="h-7 w-7 shrink-0 mt-0.5">
@@ -306,7 +358,6 @@ function CommentThread({
         </Box>
       </Box>
 
-      {/* Reply input */}
       {showReplyInput && currentUser ? (
         <Box className="px-3 pb-2.5 flex gap-2 bg-slate-50 dark:bg-slate-800/50">
           <Avatar className="h-6 w-6 shrink-0 mt-1.5">
@@ -330,7 +381,6 @@ function CommentThread({
         </Box>
       ) : null}
 
-      {/* Nested replies */}
       {showReplies && replies.length > 0 ? (
         <Box className="border-t border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/40 px-3 py-2 flex flex-col gap-2">
           {replies.map((reply) => (
@@ -345,7 +395,6 @@ function CommentThread({
                 <Text className="text-[10px] ml-10 text-slate-400">{timeAgo(reply.createdAt)}</Text>
               ) : null}
               <Text className="text-xs text-slate-700 dark:text-slate-300 mt-2 leading-relaxed">{reply.text}</Text>
-          
             </Box>
           ))}
         </Box>
@@ -451,19 +500,65 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    if (refreshCounter > 0) setIsRefreshing(true);
-    const token = getToken();
-    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-    if (token) headers.Authorization = `Bearer ${token}`;
+    let cancelled = false;
 
-    fetch(`${getApiBase()}/api/posts`, { headers })
-      .then((r) => r.json())
-      .then((data) => {
-        const raw = Array.isArray(data) ? data : data?.posts ?? data?.data?.posts ?? [];
-        setPosts(raw);
-      })
-      .catch((err) => console.error('fetchPosts error:', err))
-      .finally(() => { setPostsLoading(false); setIsRefreshing(false); });
+    const loadPosts = async () => {
+      const cachedPosts = refreshCounter === 0 ? readPostsCache() : null;
+
+      if (cachedPosts) {
+        if (!cancelled) {
+          setPosts(cachedPosts);
+          setPostsLoading(false);
+        }
+        return;
+      }
+
+      if (refreshCounter > 0) {
+        setIsRefreshing(true);
+      }
+
+      const token = getToken();
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) headers.Authorization = `Bearer ${token}`;
+
+      try {
+        const response = await fetch(`${getApiBase()}/api/posts`, {
+          headers,
+          cache: 'no-store',
+        });
+
+        if (!response.ok) {
+          throw new Error(`Failed to fetch posts: ${response.status}`);
+        }
+
+        const data = await response.json();
+        const rawPosts = Array.isArray(data)
+          ? data
+          : data?.posts ?? data?.data?.posts ?? [];
+
+        const normalizedPosts = rawPosts.map(normalizePost);
+
+        if (!cancelled) {
+          setPosts(normalizedPosts);
+          writePostsCache(normalizedPosts);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          console.error('fetchPosts error:', err);
+        }
+      } finally {
+        if (!cancelled) {
+          setPostsLoading(false);
+          setIsRefreshing(false);
+        }
+      }
+    };
+
+    loadPosts();
+
+    return () => {
+      cancelled = true;
+    };
   }, [refreshCounter]);
 
   // ── Featured hangout: Live takes priority, otherwise the soonest Upcoming ──
@@ -551,7 +646,7 @@ export default function Home() {
       }
     } catch (err) {
       console.error('incrementView error:', err);
-      viewedPostsRef.current.delete(postId); // allow retry on next scroll-into-view
+      viewedPostsRef.current.delete(postId);
     }
   };
 
@@ -560,7 +655,6 @@ export default function Home() {
     if (!token) { router.push('/auth/signin'); return; }
     const uid = getUserId(currentUser);
 
-    // Optimistic
     setPosts((prev) => prev.map((p) => {
       if ((p._id ?? p.id) !== postId) return p;
       const liked = p.likes.includes(uid);
@@ -705,8 +799,6 @@ export default function Home() {
         <Box className="hidden md:block md:w-64 md:shrink-0" />
 
         <Box className="flex-1 px-3 pb-8 md:ml-2 md:h-screen md:overflow-hidden md:p-6">
-
-          {/* Sticky header */}
           <div className="sticky top-0 z-40 bg-slate-50/95 dark:bg-slate-950/95 backdrop-blur-md border-b border-slate-200/70 dark:border-slate-800 md:relative md:border-b-0 md:bg-transparent">
             <div className="flex items-center justify-between border-b border-slate-200/70 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 px-4 py-3 md:hidden">
               <button type="button" onClick={() => setMobileOpen(true)} aria-label="Open navigation" className="rounded-md p-2 text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800">
@@ -719,20 +811,20 @@ export default function Home() {
               <div className="w-9" />
             </div>
 
-            <Box className="px-4 py-3 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md md:rounded-2xl md:bg-white md:dark:bg-slate-900 md:border md:border-slate-200/70 dark:border-slate-800 md:px-6 md:py-3.5 md:mb-3">
+            <Box className="px-4 py-3 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md md:rounded-2xl md:bg-white md:dark:bg-slate-900 md:border md:border-slate-200/70 dark:border-slate-800 md:p-4">
               <Box className="flex-row items-center gap-3">
                 <Box className="flex-row items-center gap-2">
                   <Icon as={GlobeIcon} className="h-4 w-4 text-emerald-600" />
                   <Text className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">Filter posts</Text>
                 </Box>
                 <Select selectedValue={selectedCountry} onValueChange={(v: any) => setSelectedCountry(v)}>
-                  <SelectTrigger variant="outline" size="sm" className="w-44 rounded-full border-slate-200 bg-white text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 px-4 py-1.5">
+                  <SelectTrigger variant="outline" size="sm" className="w-44 rounded-full border-slate-200 bg-white text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 px-4 py-2.5">
                     <SelectInput placeholder="All Countries" value={selectedCountry === 'all' ? 'All Countries' : selectedCountry} className="text-sm font-medium text-slate-700 dark:text-slate-200" />
                     <SelectIcon className="mr-3" as={ChevronDownIcon} />
                   </SelectTrigger>
                   <SelectPortal>
                     <SelectBackdrop />
-                    <SelectContent className="max-h-[70vh] scrollbar-hide rounded-t-2xl bg-white px-2 pb-6 md:max-h-96 md:rounded-2xl md:border md:p-2 md:shadow-xl dark:bg-slate-900 dark:border-slate-800">
+                    <SelectContent className="max-h-[70vh] scrollbar-hide rounded-t-2xl bg-white px-2 pb-6 md:max-h-96 md:rounded-2xl md:border md:p-2 md:shadow-xl dark:bg-slate-900 dark:border-slate-700">
                       <SelectDragIndicatorWrapper className="py-3">
                         <SelectDragIndicator className="bg-slate-200 dark:bg-slate-700" />
                       </SelectDragIndicatorWrapper>
@@ -743,16 +835,15 @@ export default function Home() {
                     </SelectContent>
                   </SelectPortal>
                 </Select>
-                <button type="button" onClick={toggleTheme} aria-label="Toggle dark mode" className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700">
+                <button type="button" onClick={toggleTheme} aria-label="Toggle dark mode" className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">
                   <Icon as={theme === 'dark' ? SunIcon : MoonIcon} className="h-4 w-4" />
                 </button>
               </Box>
             </Box>
           </div>
 
-          {/* Welcome banner — guests only */}
           {!currentUser && (
-            <div className="welcome-card relative mt-3 mb-3 overflow-hidden rounded-2xl border border-amber-100 p-3 shadow-sm shadow-amber-100/70 md:mb-4 md:rounded-3xl md:p-6 bg-gradient-to-r from-amber-50/50 to-emerald-50/50 dark:from-slate-800/80 dark:to-slate-900/90">
+            <div className="welcome-card relative mt-3 mb-3 overflow-hidden rounded-2xl border border-amber-100 p-3 shadow-sm shadow-amber-100/70 md:mb-4 md:rounded-3xl md:p-6 bg-gradient-to-r from-amber-50 via-amber-50 to-orange-50 dark:from-amber-950/30 dark:via-slate-900 dark:to-orange-950/20">
               <div className="relative flex flex-col gap-2 md:flex-row md:items-center md:justify-between md:gap-3">
                 <div className="flex flex-col gap-1">
                   <Text className="text-[15px] tracking-[0.20em] md:text-xl md:tracking-[0.24em] font-bold uppercase text-amber-600">
@@ -779,9 +870,8 @@ export default function Home() {
             </div>
           )}
 
-          {/* Complete-your-profile banner — signed-in users missing languages/frameworks */}
           {currentUser && needsStackSetup && (
-            <div className="stack-setup-card relative mt-3 mb-3 overflow-hidden rounded-2xl border border-emerald-100 p-3 shadow-sm shadow-emerald-100/70 md:mb-4 md:rounded-3xl md:p-6 bg-gradient-to-r from-emerald-50/60 to-amber-50/50 dark:from-slate-800/80 dark:to-slate-900/90">
+            <div className="stack-setup-card relative mt-3 mb-3 overflow-hidden rounded-2xl border border-emerald-100 p-3 shadow-sm shadow-emerald-100/70 md:mb-4 md:rounded-3xl md:p-6 bg-gradient-to-r from-emerald-50 via-white to-sky-50 dark:from-emerald-950/20 dark:via-slate-900 dark:to-sky-950/20">
               <div className="relative flex flex-col gap-2 md:flex-row md:items-center md:justify-between md:gap-3">
                 <div className="flex flex-col gap-1">
                   <Text className="text-[15px] tracking-[0.20em] md:text-xl md:tracking-[0.24em] font-bold uppercase text-emerald-600">
@@ -808,10 +898,7 @@ export default function Home() {
             </div>
           )}
 
-          {/* Feed + sidebar */}
           <Box className="flex flex-col gap-4 md:min-h-0 md:flex-1 md:flex-row md:gap-6">
-
-            {/* Feed */}
             <div
               ref={feedRef}
               className="order-2 w-full md:order-1 md:h-full md:w-[63%] md:min-h-0 md:overflow-y-auto md:pr-2 md:pb-6 scrollbar-hide"
@@ -846,7 +933,6 @@ export default function Home() {
                     const authorCountry = getCountryName(post.user?.country);
                     const postTags: string[] = post.tags ?? [];
 
-                    // Long-content collapse.
                     const contentIsLong = post.content.length > CONTENT_TRUNCATE_LENGTH;
                     const contentExpanded = expandedPosts.has(postId);
                     const displayedContent =
@@ -854,9 +940,6 @@ export default function Home() {
                         ? post.content.slice(0, CONTENT_TRUNCATE_LENGTH).trimEnd()
                         : post.content;
 
-                    // Long-code collapse (by line count, not just character count,
-                    // so a few long lines don't dodge the collapse and a short
-                    // multi-line snippet doesn't get needlessly collapsed).
                     const codeLineCount = post.codeSnippet ? post.codeSnippet.split('\n').length : 0;
                     const codeIsLong = codeLineCount > CODE_COLLAPSE_LINE_THRESHOLD || (post.codeSnippet?.length ?? 0) > 320;
                     const codeExpanded = expandedCode.has(postId);
@@ -867,7 +950,6 @@ export default function Home() {
                         data-post-id={postId}
                         className="w-full shadow shadow-slate-200 rounded-2xl bg-white border border-slate-100 p-5 dark:shadow-slate-950/40 dark:bg-slate-900 dark:border-slate-800"
                       >
-                        {/* Header */}
                         <Box className="flex-row items-center justify-between">
                           <Box className="flex-row items-center gap-3">
                             <Avatar>
@@ -899,16 +981,10 @@ export default function Home() {
                           </Popover>
                         </Box>
 
-                        {/* Body */}
                         {post.title ? (
                           <Text className="text-xl md:text-2xl font-bold text-slate-900 dark:text-slate-100 mt-3 mb-1">{post.title}</Text>
                         ) : null}
 
-                        {/*
-                          "Read more"/"Show less" now render inline, in place of
-                          where the truncation cuts off — no more trailing "…"
-                          and no separate line below the paragraph.
-                        */}
                         <Text className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed mt-2 whitespace-pre-wrap">
                           {displayedContent}
                           {contentIsLong ? (
@@ -948,35 +1024,30 @@ export default function Home() {
                           </Box>
                         ) : null}
 
-                        {post.imageUrl ? (
+                        {(post.postImageUrl || post.imageUrl) ? (
                           <img
-                            src={post.imageUrl}
-                            alt="post"
-                            className="mt-3 rounded-xl w-full object-cover max-h-64"
-                            onError={(e) => {
-                              // Hide the broken-image icon rather than show it —
-                              // this is a safety net for legacy posts saved
-                              // before validation was added at creation time
-                              // (see CreateTopicPage.tsx).
-                              (e.currentTarget as HTMLImageElement).style.display = 'none';
+                            src={post.postImageUrl || post.imageUrl}
+                            alt={post.title ? `${post.title} cover image` : 'Post cover'}
+                            loading="lazy"
+                            decoding="async"
+                            className="mt-3 max-h-64 w-full rounded-xl object-cover"
+                            onError={(event) => {
+                              event.currentTarget.style.display = 'none';
                             }}
                           />
                         ) : null}
 
-                        {/* Tags */}
                         {postTags.length > 0 && (
                           <Box className="mt-3 flex-row flex-wrap gap-2">
                             {postTags.map((tag) => (
-                              <Card key={tag} className="bg-emerald-50 items-center justify-center rounded-full px-3 py-1 border border-emerald-100 shadow-none dark:bg-emerald-900/20 dark:border-emerald-800">
+                              <Card key={tag} className="bg-emerald-50 items-center justify-center rounded-full px-3 py-1 border border-emerald-100 shadow-none dark:bg-emerald-900/20 dark:border-emerald-800/50">
                                 <Text className="text-emerald-700 dark:text-emerald-300 text-xs font-medium">{tag}</Text>
                               </Card>
                             ))}
                           </Box>
                         )}
 
-                        {/* Actions */}
                         <Box className="mt-3 flex-row items-center gap-5 border-t border-slate-100 dark:border-slate-800 pt-3">
-                          {/* Like */}
                           <button
                             type="button"
                             onClick={() => handleToggleLike(postId)}
@@ -986,7 +1057,6 @@ export default function Home() {
                             <span>{post.likes.length}</span>
                           </button>
 
-                          {/* Comments icon */}
                           <button
                             type="button"
                             onClick={() => { setActivePostId(postId); setCommentDraft(''); }}
@@ -996,7 +1066,6 @@ export default function Home() {
                             <span>{post.comments.length} {post.comments.length === 1 ? 'comment' : 'comments'}</span>
                           </button>
 
-                          {/* Views icon */}
                           <Box className="flex-row items-center gap-1.5 ml-auto">
                             <Icon as={EyeIcon} className="h-4 w-4 text-slate-400" />
                             <Text className="text-xs font-medium text-slate-400">{post.views ?? 0}</Text>
@@ -1009,7 +1078,6 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Right sidebar */}
             <Box className="order-1 w-full flex flex-col gap-4 md:order-2 md:h-full md:w-[35%] md:overflow-y-auto scrollbar-hide">
               {featuredHangout ? (
                 <Card className="w-full rounded-2xl bg-white border border-slate-100 p-4 dark:bg-slate-900 dark:border-slate-800 shadow shadow-slate-200 dark:shadow-slate-950/40">
@@ -1074,9 +1142,11 @@ export default function Home() {
         </Box>
       </Box>
 
-      {/* Nav drawer */}
       <div
-        className={`fixed inset-y-0 left-0 z-50 w-72 -translate-x-full transform bg-slate-900 text-white shadow-2xl transition-transform duration-300 ease-out md:w-64 md:translate-x-0 md:shadow-none ${mobileOpen ? 'translate-x-0' : ''}`}
+        className={`fixed inset-y-0 left-0 z-50 w-72 -translate-x-full transform bg-slate-900 text-white shadow-2xl transition-transform duration-300 ease-out md:w-64 md:translate-x-0 md:shadow-[...]`}
+        style={{
+          transform: mobileOpen ? 'translateX(0)' : 'translateX(-100%)',
+        }}
         onClick={(e: MouseEvent<HTMLDivElement>) => e.stopPropagation()}
       >
         <Box className="flex h-full w-full flex-col p-6 overflow-y-auto scrollbar-hide">
@@ -1090,7 +1160,7 @@ export default function Home() {
           <Box className="gap-1.5 mb-6">
             {navItems.map((item) => (
               <a key={item.label} href={item.href} onClick={() => setMobileOpen(false)}
-                className={`flex items-center gap-3 rounded-xl border px-4 py-3 text-sm font-medium transition duration-200 ${item.active ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300' : 'border-transparent text-slate-300 hover:bg-slate-800 hover:text-white'}`}>
+                className={`flex items-center gap-3 rounded-xl border px-4 py-3 text-sm font-medium transition duration-200 ${item.active ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300' : 'border-slate-800 bg-slate-900/40 text-slate-200 hover:border-slate-700 hover:bg-slate-800/60'}`}>
                 <span className={item.active ? 'text-emerald-300' : 'text-emerald-400'}>{item.icon}</span>
                 <span className={item.active ? 'font-semibold' : 'font-medium'}>{item.label}</span>
               </a>
@@ -1110,7 +1180,7 @@ export default function Home() {
                 <Pressable onPress={handleCreateTopic} className="mt-3 flex items-center justify-center rounded-xl bg-emerald-600 px-4 py-2.5">
                   <Text className="text-sm font-semibold text-white">Create Topic</Text>
                 </Pressable>
-                <Pressable onPress={() => setShowLogoutConfirm(true)} className="mt-2 flex items-center justify-center rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 dark:border-red-900/40 dark:bg-red-950/20">
+                <Pressable onPress={() => setShowLogoutConfirm(true)} className="mt-2 flex items-center justify-center rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 dark:border-red-900/50 dark:bg-red-950/20">
                   <Text className="text-sm font-semibold text-red-600 dark:text-red-400">Log out</Text>
                 </Pressable>
               </>
@@ -1126,15 +1196,14 @@ export default function Home() {
         </Box>
       </div>
 
-      {/* Scroll to top */}
       {showScrollTop ? (
         <button type="button" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} aria-label="Scroll to top"
-          className="fixed bottom-6 right-6 z-50 inline-flex h-12 w-12 items-center justify-center rounded-full bg-slate-900 text-slate-100 shadow-lg transition hover:bg-slate-700 dark:bg-slate-100 dark:text-slate-950">
+          className="fixed bottom-6 right-6 z-50 inline-flex h-12 w-12 items-center justify-center rounded-full bg-slate-900 text-slate-100 shadow-lg transition hover:bg-slate-700 dark:bg-slate-800"
+        >
           <Icon as={ArrowUpIcon} className="h-5 w-5" />
         </button>
       ) : null}
 
-      {/* Profile-incomplete reminder popup */}
       {showProfileReminder ? (
         <div className="fixed inset-0 z-[60] flex items-center justify-center px-4">
           <div
@@ -1175,7 +1244,6 @@ export default function Home() {
         </div>
       ) : null}
 
-      {/* Logout confirmation popup */}
       {showLogoutConfirm ? (
         <div className="fixed inset-0 z-[60] flex items-center justify-center px-4">
           <div
@@ -1225,26 +1293,21 @@ export default function Home() {
         }
       `}</style>
 
-      {/* Comments & Replies Modal */}
       {activePost ? (
         <div className="fixed inset-0 z-50 flex items-end justify-center md:items-center">
           <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setActivePostId(null)} />
           <div className="relative z-10 w-full max-w-lg flex flex-col rounded-t-2xl bg-white dark:bg-slate-900 shadow-2xl md:rounded-2xl" style={{ maxHeight: '85vh' }}>
-
-            {/* Modal header */}
             <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 dark:border-slate-800 shrink-0">
               <div>
                 <Text className="font-semibold text-slate-900 dark:text-slate-100">
                   What People Are Saying
                 </Text>
-                
               </div>
               <button type="button" onClick={() => setActivePostId(null)} className="rounded-full p-1.5 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800">
                 <CloseIcon className="h-4 w-4" />
               </button>
             </div>
 
-            {/* Like summary */}
             <div className="flex items-center gap-2 px-4 py-2 bg-slate-50 dark:bg-slate-800/50 border-b border-slate-100 dark:border-slate-800 shrink-0">
               <button
                 type="button"
@@ -1256,7 +1319,6 @@ export default function Home() {
               </button>
             </div>
 
-            {/* list of comments */}
             <div className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-3">
               {activePost.comments.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-10 gap-2">
@@ -1276,7 +1338,6 @@ export default function Home() {
               )}
             </div>
 
-            {/* Add your comment */}
             <div className="shrink-0 px-4 py-3 border-t border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900">
               {currentUser ? (
                 <div className="flex items-center gap-2">
@@ -1309,7 +1370,6 @@ export default function Home() {
         </div>
       ) : null}
 
-      {/* Mobile drawer overlay */}
       {mobileOpen ? (
         <button type="button" className="fixed inset-0 z-40 bg-slate-950/50 md:hidden backdrop-blur-sm" onClick={() => setMobileOpen(false)} aria-label="Close navigation overlay" />
       ) : null}
